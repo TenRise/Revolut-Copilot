@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Revolut Copilot — AI Edition v2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0b0f19; }
+        .code-font { font-family: 'JetBrains Mono', monospace; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        @keyframes pulse-ring { 0%,100%{opacity:1}50%{opacity:0.4} }
+        .pulse-ring { animation: pulse-ring 1.2s ease-in-out infinite; }
+        .row-selected { background: rgba(99,102,241,0.08); border-left: 2px solid #6366f1; }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col">
+
+<!-- ── HEADER ────────────────────────────────────────────────────────────── -->
+<header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+            <i class="fa-solid fa-compass text-slate-900 text-xl animate-pulse"></i>
+        </div>
+        <div>
+            <h1 class="font-bold text-lg leading-tight">REVOLUT COPILOT <span class="text-[10px] text-indigo-400 font-mono bg-indigo-950 px-1.5 py-0.5 rounded ml-1">v2</span></h1>
+            <p class="text-xs text-emerald-400 flex items-center gap-1.5 font-medium">
+                <span class="inline-block h-2 w-2 rounded-full bg-emerald-400 pulse-ring"></span>
+                <span id="status-line">Initialising…</span>
+            </p>
+        </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="hidden lg:flex items-center gap-8 text-sm border-l border-slate-800 pl-8">
+        <div>
+            <span class="text-xs text-slate-400 block">Portfolio Balance</span>
+            <span class="font-bold text-slate-100 text-base" id="stat-total-balance">—</span>
+        </div>
+        <div>
+            <span class="text-xs text-slate-400 block">Unrealised P&amp;L</span>
+            <span class="font-semibold text-emerald-400 flex items-center gap-1" id="stat-pnl">—</span>
+        </div>
+        <div>
+            <span class="text-xs text-slate-400 block">Next Price Sync</span>
+            <span class="text-xs font-mono text-cyan-400" id="refresh-countdown">⟳ 10s</span>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex items-center gap-3">
+        <button onclick="manualRefresh()" class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg text-sm transition font-semibold border border-slate-700">
+            <i class="fa-solid fa-arrows-rotate" id="refresh-icon"></i> Refresh Now
+        </button>
+        <button onclick="toggleModal('modal-manual-add')" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm transition font-semibold shadow-lg shadow-emerald-600/20">
+            <i class="fa-solid fa-plus"></i> Record Buy
+        </button>
+        <button onclick="toggleModal('modal-settings')" class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg text-sm transition font-medium border border-slate-700">
+            <i class="fa-solid fa-sliders"></i> Setup Keys
+        </button>
+    </div>
+</header>
+
+<!-- ── MAIN GRID ──────────────────────────────────────────────────────────── -->
+<main class="flex-1 p-6 grid grid-cols-1 xl:grid-cols-12 gap-6 max-w-[1700px] w-full mx-auto">
+
+    <!-- LEFT: Watchlist + Top Pick + Holdings -->
+    <section class="xl:col-span-5 flex flex-col gap-6">
+
+        <!-- Watchlist -->
+        <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-md">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="font-bold text-slate-200 flex items-center gap-2">
+                    <i class="fa-solid fa-globe text-indigo-400"></i> Live Watchlist
+                </h2>
+                <span class="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full flex items-center gap-1.5 font-mono" id="last-update-time">
+                    <span class="h-1.5 w-1.5 rounded-full bg-slate-500"></span> —
+                </span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="text-xs text-slate-400 border-b border-slate-800/80">
+                            <th class="pb-3 font-medium">Asset</th>
+                            <th class="pb-3 text-right font-medium">Price</th>
+                            <th class="pb-3 text-right font-medium">24h</th>
+                            <th class="pb-3 text-right font-medium">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="watchlist-body" class="divide-y divide-slate-800/50"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Top AI Pick -->
+        <div class="bg-gradient-to-r from-indigo-950/40 to-slate-900/60 border border-indigo-900/30 rounded-2xl p-5 backdrop-blur-md">
+            <h3 class="text-sm font-bold text-indigo-300 flex items-center gap-2 mb-3">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Top AI Momentum Pick
+            </h3>
+            <div class="bg-slate-950/40 border border-slate-850 p-4 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                    <span class="text-xs text-slate-400 block uppercase tracking-wider font-semibold">Suggested Pick</span>
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-lg font-bold text-slate-100" id="trending-asset">—</span>
+                        <span class="text-xs text-emerald-400 font-semibold" id="trending-holdtime"></span>
+                    </div>
+                    <span class="text-xs text-slate-300 block mt-1" id="trending-reason">Waiting for first price sync…</span>
+                </div>
+                <button id="btn-inspect-top" onclick="inspectTopAsset()" disabled class="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold py-2.5 px-3 rounded-lg transition whitespace-nowrap">
+                    AI Deep Scan
+                </button>
+            </div>
+        </div>
+
+        <!-- Holdings -->
+        <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-md flex-1 min-h-[250px] flex flex-col">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="font-bold text-slate-200 flex items-center gap-2">
+                    <i class="fa-solid fa-wallet text-indigo-400"></i> My Revolut Holdings
+                </h2>
+                <button onclick="toggleModal('modal-manual-add')" class="text-xs text-emerald-400 hover:underline flex items-center gap-1">
+                    <i class="fa-solid fa-plus-circle"></i> Add
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto max-h-[300px]">
+                <div id="no-holdings-msg" class="h-full flex flex-col items-center justify-center text-center text-slate-500 py-8">
+                    <i class="fa-solid fa-box-open text-3xl mb-2"></i>
+                    <p class="text-sm">No holdings tracked yet.</p>
+                    <p class="text-xs text-slate-600">Scan an asset, then record your Revolut purchase.</p>
+                </div>
+                <div id="holdings-list" class="space-y-3 hidden"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- RIGHT: Chart + AI Brain + Terminal -->
+    <section class="xl:col-span-7 flex flex-col gap-6">
+
+        <!-- Chart -->
+        <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-md h-[240px] flex flex-col">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="font-semibold text-slate-200 text-sm flex items-center gap-1.5">
+                    <i class="fa-solid fa-chart-area text-purple-400"></i> Portfolio Equity Curve
+                </h3>
+                <span class="text-xs text-slate-400 font-medium">Auto-tracking</span>
+            </div>
+            <div class="flex-1 relative min-h-0"><canvas id="equityChart"></canvas></div>
+        </div>
+
+        <!-- AI Brain -->
+        <div class="bg-gradient-to-b from-slate-900 to-slate-950 border border-indigo-950 rounded-2xl p-5 relative overflow-hidden">
+            <div class="absolute -right-12 -top-12 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="flex items-center justify-between mb-4 border-b border-slate-800/50 pb-3">
+                <h2 class="font-bold text-slate-200 flex items-center gap-2">
+                    <i class="fa-solid fa-brain text-indigo-400"></i> AI Decision Core
+                    <span class="text-[10px] font-mono text-slate-500 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">Gemini + Web Search</span>
+                </h2>
+                <div class="flex items-center gap-3">
+                    <!-- Auto-scan toggle -->
+                    <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                        <span class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Auto-Scan</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="auto-scan-toggle" onchange="toggleAutoScan(this.checked)" class="sr-only peer">
+                            <div class="w-8 h-4 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-500"></div>
+                        </label>
+                        <span class="text-[10px] text-cyan-400 font-mono" id="ai-scan-countdown"></span>
+                    </label>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 bg-slate-950/60 px-3 py-1 rounded-md border border-slate-800" id="current-scan-asset">
+                        Ready
+                    </span>
+                </div>
+            </div>
+
+            <div id="ai-output-container">
+                <!-- Idle -->
+                <div id="ai-idle-state" class="text-center py-10">
+                    <div class="inline-flex items-center justify-center h-14 w-14 rounded-full bg-indigo-950/50 text-indigo-400 border border-indigo-800/30 mb-3 animate-pulse">
+                        <i class="fa-solid fa-magnifying-glass-chart text-xl"></i>
+                    </div>
+                    <h3 class="font-semibold text-slate-300">Click a ticker row to scan</h3>
+                    <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed">
+                        AI uses live Google Search to pull latest news, analyst ratings, and sentiment before recommending BUY / SELL / HOLD.
+                    </p>
+                </div>
+
+                <!-- Scanning -->
+                <div id="ai-scanning-state" class="hidden text-center py-10">
+                    <div class="inline-flex items-center justify-center h-14 w-14 rounded-full bg-indigo-900/30 border border-indigo-700/30 mb-3 animate-spin">
+                        <i class="fa-solid fa-circle-notch text-xl text-indigo-400"></i>
+                    </div>
+                    <h3 class="font-semibold text-slate-300">Searching the web + reasoning…</h3>
+                    <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1">Pulling real-time news, analyst sentiment, and price levels.</p>
+                </div>
+
+                <!-- Result card -->
+                <div id="ai-analysis-card" class="hidden space-y-4">
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="p-3.5 rounded-xl border flex items-center gap-3" id="badge-action-container">
+                            <div class="h-10 w-10 rounded-lg flex items-center justify-center text-lg" id="badge-action-icon">
+                                <i class="fa-solid fa-chart-pie"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Decision</span>
+                                <span class="font-bold text-sm" id="badge-action-text">—</span>
+                            </div>
+                        </div>
+                        <div class="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 flex items-center gap-3">
+                            <div class="h-10 w-10 rounded-lg flex items-center justify-center text-lg" id="badge-safety-icon">
+                                <i class="fa-solid fa-user-shield"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Risk</span>
+                                <span class="font-bold text-sm" id="badge-safety-text">—</span>
+                            </div>
+                        </div>
+                        <div class="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 flex items-center gap-3">
+                            <div class="h-10 w-10 rounded-lg bg-teal-500/10 text-teal-400 border border-teal-500/20 flex items-center justify-center text-lg">
+                                <i class="fa-solid fa-gauge-high"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Confidence</span>
+                                <span class="font-bold text-slate-200 text-sm" id="badge-confidence-text">—</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TP / SL -->
+                    <div class="grid grid-cols-2 gap-4 bg-slate-950/60 p-4 rounded-xl border border-slate-900">
+                        <div>
+                            <span class="text-xs text-slate-400 flex items-center gap-1.5 mb-1">
+                                <span class="h-2 w-2 rounded-full bg-emerald-500"></span> Take-Profit Target
+                            </span>
+                            <span class="text-xl font-bold text-emerald-400 font-mono" id="target-tp">$—</span>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-400 flex items-center gap-1.5 mb-1">
+                                <span class="h-2 w-2 rounded-full bg-rose-500"></span> Stop-Loss Limit
+                            </span>
+                            <span class="text-xl font-bold text-rose-400 font-mono" id="target-sl">$—</span>
+                        </div>
+                    </div>
+
+                    <!-- Reasoning -->
+                    <div>
+                        <span class="text-xs font-semibold text-indigo-300 uppercase tracking-wider block mb-1">AI Reasoning (web-grounded):</span>
+                        <p class="text-sm text-slate-300 leading-relaxed bg-slate-950/40 p-4 rounded-xl border border-slate-900" id="ai-reasoning-text">—</p>
+                    </div>
+
+                    <!-- Action buttons -->
+                    <div class="flex flex-col md:flex-row gap-3 pt-2">
+                        <button onclick="promptRecordManualBuy()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-6 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/10">
+                            <i class="fa-solid fa-file-signature"></i> Record in Tracker
+                        </button>
+                        <button onclick="rejectTrade()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-3 px-6 rounded-xl transition flex items-center justify-center gap-2 border border-slate-700">
+                            <i class="fa-solid fa-circle-xmark"></i> Dismiss
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Terminal log -->
+        <div class="bg-slate-950 border border-slate-900 rounded-2xl p-4 flex flex-col flex-1 min-h-[180px]">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold text-slate-400 flex items-center gap-2">
+                    <i class="fa-solid fa-terminal text-teal-400"></i> Engine Log
+                </span>
+                <button onclick="clearLogs()" class="text-[10px] hover:text-slate-200 text-slate-500 underline">Clear</button>
+            </div>
+            <div id="terminal" class="flex-1 code-font text-xs text-slate-300 space-y-1.5 overflow-y-auto max-h-[180px] p-3 bg-slate-950 rounded-xl border border-slate-900">
+                <div class="text-slate-500">[boot] Revolut Copilot v2 loading…</div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<!-- ── SETTINGS MODAL ─────────────────────────────────────────────────────── -->
+<div id="modal-settings" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div class="p-6 border-b border-slate-800 flex justify-between items-center">
+            <h3 class="font-bold text-lg text-slate-100 flex items-center gap-2">
+                <i class="fa-solid fa-key text-indigo-400"></i> API Keys & Settings
+            </h3>
+            <button onclick="toggleModal('modal-settings')" class="text-slate-400 hover:text-slate-100 text-lg"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="p-6 space-y-5">
+            <!-- Info banner -->
+            <div class="bg-indigo-950/40 border border-indigo-900/30 p-3 rounded-xl flex gap-2.5 items-start">
+                <i class="fa-solid fa-circle-info text-indigo-400 text-base mt-0.5"></i>
+                <p class="text-xs text-slate-300 leading-relaxed">All keys are saved in <strong>your browser only</strong> (localStorage). Nothing is sent to any server by this app.</p>
+            </div>
+
+            <!-- Initial balance -->
+            <div class="space-y-1.5">
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">Your Starting Portfolio Balance ($)</label>
+                <input type="number" id="input-initial-balance" placeholder="e.g. 5000" step="any" class="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-sm font-mono text-slate-100 focus:outline-none focus:border-indigo-500 transition">
+                <span class="block text-[10px] text-slate-500">Sets the baseline for P&amp;L calculation. Update when you add cash to Revolut.</span>
+            </div>
+
+            <!-- Gemini key -->
+            <div class="space-y-1.5">
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                    Google Gemini API Key <span class="text-indigo-400">(AI Analysis + Web Search)</span>
+                </label>
+                <div class="relative">
+                    <input type="password" id="input-api-key" placeholder="AIzaSy…" class="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-3 pr-10 text-sm font-mono text-slate-100 focus:outline-none focus:border-indigo-500 transition">
+                    <button onclick="toggleInputType('input-api-key')" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-100"><i class="fa-regular fa-eye"></i></button>
+                </div>
+                <span class="block text-[10px] text-slate-500">Free at <a href="https://aistudio.google.com" target="_blank" class="text-indigo-400 underline">Google AI Studio</a>. Used for Gemini 2.0 Flash + real-time Google Search grounding.</span>
+            </div>
+
+            <!-- Finnhub key -->
+            <div class="space-y-1.5">
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                    Finnhub API Key <span class="text-cyan-400">(Live Stock Prices)</span>
+                </label>
+                <div class="relative">
+                    <input type="password" id="input-finnhub-key" placeholder="cv…" class="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-3 pr-10 text-sm font-mono text-slate-100 focus:outline-none focus:border-indigo-500 transition">
+                    <button onclick="toggleInputType('input-finnhub-key')" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-100"><i class="fa-regular fa-eye"></i></button>
+                </div>
+                <span class="block text-[10px] text-slate-500">Free at <a href="https://finnhub.io/register" target="_blank" class="text-cyan-400 underline">finnhub.io/register</a> (60 calls/min). Replaces broken Yahoo Finance. Crypto via CoinGecko (no key needed).</span>
+            </div>
+
+            <!-- Telegram -->
+            <div class="border-t border-slate-800/80 pt-4 space-y-3">
+                <div class="flex items-center gap-2">
+                    <i class="fa-brands fa-telegram text-sky-400 text-lg"></i>
+                    <span class="block text-xs font-bold text-slate-300 uppercase tracking-wider">Telegram Alerts (Optional)</span>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="space-y-1">
+                        <label class="block text-[10px] font-semibold text-slate-400">Bot Token</label>
+                        <input type="password" id="input-tg-token" placeholder="123456789:ABC…" class="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-xs font-mono text-slate-100 focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-[10px] font-semibold text-slate-400">Chat ID</label>
+                        <input type="text" id="input-tg-chat" placeholder="-100123456" class="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-xs font-mono text-slate-100 focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="p-6 bg-slate-950/50 border-t border-slate-800 flex justify-end gap-3">
+            <button onclick="toggleModal('modal-settings')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg transition">Cancel</button>
+            <button onclick="saveSettings()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition shadow-lg shadow-indigo-600/10">Save & Apply</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── MANUAL BUY MODAL ───────────────────────────────────────────────────── -->
+<div id="modal-manual-add" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl">
+        <div class="p-6 border-b border-slate-800 flex justify-between items-center">
+            <h3 class="font-bold text-lg text-slate-100 flex items-center gap-2">
+                <i class="fa-solid fa-file-pen text-emerald-400"></i> Record Revolut Position
+            </h3>
+            <button onclick="toggleModal('modal-manual-add')" class="text-slate-400 hover:text-slate-100 text-lg"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="p-6 space-y-4">
+            <div class="space-y-1.5">
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">Asset Ticker</label>
+                <input id="manual-add-ticker" type="text" placeholder="AAPL / BTC-USD / NVDA…" class="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-sm font-mono text-slate-100 focus:outline-none focus:border-indigo-500 uppercase">
+                <span class="text-[10px] text-slate-500">Type any ticker — it will be added to your watchlist automatically.</span>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">Entry Price ($)</label>
+                    <input type="number" id="manual-add-price" step="any" placeholder="e.g. 182.50" class="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-sm font-mono text-slate-100 focus:outline-none focus:border-indigo-500">
+                </div>
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">Quantity</label>
+                    <input type="number" id="manual-add-qty" step="any" placeholder="e.g. 5" class="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-sm font-mono text-slate-100 focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">Take-Profit ($)</label>
+                    <input type="number" id="manual-add-tp" step="any" placeholder="Optional" class="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-sm font-mono text-slate-100 focus:outline-none focus:border-indigo-500">
+                </div>
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">Stop-Loss ($)</label>
+                    <input type="number" id="manual-add-sl" step="any" placeholder="Optional" class="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-3 text-sm font-mono text-slate-100 focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+        </div>
+        <div class="p-6 bg-slate-950/50 border-t border-slate-800 flex justify-end gap-3">
+            <button onclick="toggleModal('modal-manual-add')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg transition">Cancel</button>
+            <button onclick="submitManualPurchase()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition shadow-lg shadow-emerald-600/10">Record Position</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── TOAST ──────────────────────────────────────────────────────────────── -->
+<div id="toast" class="fixed bottom-6 right-6 bg-slate-900 border border-slate-800 text-slate-100 text-xs px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 z-[9999] opacity-0 pointer-events-none transition-all duration-300 transform translate-y-2">
+    <i class="fa-solid fa-circle-check text-emerald-400 text-base" id="toast-icon"></i>
+    <span id="toast-msg">Done!</span>
+</div>
+
+<!-- ── JAVASCRIPT ─────────────────────────────────────────────────────────── -->
+<script>
+// ─── STATE ──────────────────────────────────────────────────────────────────
+let portfolioBalance  = 10000;
+let originalBalance   = 10000;
+let holdings          = {};            // { TICKER: { quantity, entryPrice, targetTP, targetSL } }
+let currentScanTicker = null;
+let lastAIProposal    = null;
+let chartInstance     = null;
+let topAssetTicker    = null;
+let equityHistory     = new Array(20).fill(null);
+
+// Timers
+let priceInterval     = null;   // 10-second price refresh
+let countdownInterval = null;   // 1-second UI countdown
+let aiScanInterval    = null;   // 30-second AI re-scan
+let aiCountdownTimer  = null;
+let nextPriceRefresh  = 10;
+let nextAIScan        = 30;
+
+// ─── WATCHLIST (editable at runtime) ────────────────────────────────────────
+const watchlist = {
+    "AAPL":    { price: 213.00,  change: 0.80,  isCrypto: false },
+    "TSLA":    { price: 178.00,  change: -1.20, isCrypto: false },
+    "NVDA":    { price: 875.00,  change: 2.10,  isCrypto: false },
+    "MSFT":    { price: 420.00,  change: 0.40,  isCrypto: false },
+    "BTC-USD": { price: 65000,   change: 1.50,  isCrypto: true  },
+    "ETH-USD": { price: 3400,    change: 0.90,  isCrypto: true  },
+    "SOL-USD": { price: 145,     change: -2.30, isCrypto: true  },
+};
+
+// ─── BOOT ────────────────────────────────────────────────────────────────────
+window.onload = function () {
+    loadSettings();
+    loadHoldings();         // ← persisted from last session
+    renderHoldingsList();
+    initWatchlistTable();
+    initChart();
+    refreshPrices();        // immediate first fetch
+    startPriceAutoRefresh();
+    addLog("[BOOT] Revolut Copilot v2 active. Holdings and settings restored.", "info");
+    updateStatusLine("Live — auto-refreshing every 10s");
+};
+
+// ─── AUTO PRICE REFRESH ──────────────────────────────────────────────────────
+function startPriceAutoRefresh() {
+    if (priceInterval)    clearInterval(priceInterval);
+    if (countdownInterval) clearInterval(countdownInterval);
+
+    nextPriceRefresh = 10;
+    updateCountdown();
+
+    priceInterval = setInterval(() => {
+        refreshPrices();
+        nextPriceRefresh = 10;
+    }, 10000);
+
+    countdownInterval = setInterval(() => {
+        nextPriceRefresh = Math.max(0, nextPriceRefresh - 1);
+        updateCountdown();
+    }, 1000);
+}
+
+function updateCountdown() {
+    const el = document.getElementById("refresh-countdown");
+    if (el) el.innerText = `⟳ ${nextPriceRefresh}s`;
+}
+
+// Manual refresh button
+function manualRefresh() {
+    refreshPrices();
+    nextPriceRefresh = 10;
+}
+
+// ─── FETCH LIVE PRICES ───────────────────────────────────────────────────────
+async function refreshPrices() {
+    const refreshIcon = document.getElementById("refresh-icon");
+    refreshIcon.classList.add("animate-spin");
+
+    try {
+        // 1. CRYPTO — CoinGecko (free, no key, no CORS issues)
+        const cgUrl = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true";
+        const cgRes = await fetch(cgUrl);
+        if (cgRes.ok) {
+            const d = await cgRes.json();
+            if (d.bitcoin)  { watchlist["BTC-USD"].price = d.bitcoin.usd;   watchlist["BTC-USD"].change = d.bitcoin.usd_24h_change;   }
+            if (d.ethereum) { watchlist["ETH-USD"].price = d.ethereum.usd;  watchlist["ETH-USD"].change = d.ethereum.usd_24h_change;  }
+            if (d.solana)   { watchlist["SOL-USD"].price = d.solana.usd;    watchlist["SOL-USD"].change = d.solana.usd_24h_change;    }
+            addLog("[PRICE] Crypto synced via CoinGecko.", "info");
+        }
+
+        // 2. STOCKS — Finnhub (free, CORS-friendly, needs key)
+        const finnhubKey = localStorage.getItem("finnhub_key");
+        if (finnhubKey) {
+            const stockSymbols = Object.keys(watchlist).filter(t => !watchlist[t].isCrypto);
+            let successCount = 0;
+            for (const sym of stockSymbols) {
+                try {
+                    const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${finnhubKey}`);
+                    if (res.ok) {
+                        const q = await res.json();
+                        if (q.c > 0) {
+                            watchlist[sym].price  = q.c;
+                            watchlist[sym].change = q.dp;  // % change
+                            successCount++;
+                        }
+                    }
+                } catch (_) {}
+            }
+            if (successCount > 0) addLog(`[PRICE] ${successCount} stock quotes synced via Finnhub.`, "info");
+        } else {
+            // Gentle random drift if no Finnhub key — makes it obvious prices aren't real
+            const stocks = Object.keys(watchlist).filter(t => !watchlist[t].isCrypto);
+            for (const sym of stocks) {
+                const drift = (Math.random() - 0.48) * 0.003;
+                watchlist[sym].price  *= (1 + drift);
+                watchlist[sym].change  = parseFloat((watchlist[sym].change + (Math.random() - 0.5) * 0.1).toFixed(2));
+            }
+            addLog("[PRICE] No Finnhub key — stock prices are simulated. Add key in Setup Keys.", "warning");
+        }
+
+    } catch (err) {
+        addLog(`[PRICE ERROR] ${err.message}`, "warning");
+    } finally {
+        refreshIcon.classList.remove("animate-spin");
+        updateWatchlistUI();
+        determineTopPick();
+        updateStats();
+        const now = new Date();
+        document.getElementById("last-update-time").innerHTML =
+            `<span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> ${now.toLocaleTimeString()}`;
+    }
+}
+
+// ─── WATCHLIST UI ────────────────────────────────────────────────────────────
+function initWatchlistTable() {
+    const tbody = document.getElementById("watchlist-body");
+    tbody.innerHTML = "";
+    for (const ticker in watchlist) {
+        const a = watchlist[ticker];
+        const chColor = a.change >= 0 ? "text-emerald-400" : "text-rose-400";
+        const sign    = a.change >= 0 ? "+" : "";
+        const tr = document.createElement("tr");
+        tr.id        = `ticker-row-${ticker}`;
+        tr.className = "hover:bg-slate-900/40 transition cursor-pointer";
+        tr.onclick   = () => selectAndScan(ticker);
+        tr.innerHTML = `
+            <td class="py-3 font-bold text-slate-200">
+                <div class="flex items-center gap-2">
+                    <span class="h-6 w-6 rounded bg-slate-850 flex items-center justify-center text-[10px] text-slate-400 border border-slate-800">${a.isCrypto ? '₿' : 'S'}</span>
+                    ${ticker}
+                </div>
+            </td>
+            <td class="py-3 text-right font-mono font-semibold" id="ticker-price-${ticker}">$${a.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+            <td class="py-3 text-right font-mono text-xs ${chColor}" id="ticker-change-${ticker}">${sign}${a.change.toFixed(2)}%</td>
+            <td class="py-3 text-right">
+                <button class="bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white px-2.5 py-1 rounded-md text-xs font-bold transition border border-indigo-500/20">Scan</button>
+            </td>`;
+        tbody.appendChild(tr);
+    }
+}
+
+function updateWatchlistUI() {
+    for (const ticker in watchlist) {
+        const a  = watchlist[ticker];
+        const pe = document.getElementById(`ticker-price-${ticker}`);
+        const ce = document.getElementById(`ticker-change-${ticker}`);
+        if (!pe) { initWatchlistTable(); return; }
+        pe.innerText  = `$${a.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+        const sign = a.change >= 0 ? "+" : "";
+        ce.innerText  = `${sign}${a.change.toFixed(2)}%`;
+        ce.className  = `py-3 text-right font-mono text-xs ${a.change >= 0 ? "text-emerald-400" : "text-rose-400"}`;
+        monitorHolding(ticker);
+    }
+}
+
+// ─── TOP PICK ────────────────────────────────────────────────────────────────
+function determineTopPick() {
+    let top = null, maxCh = -Infinity;
+    for (const t in watchlist) {
+        if (watchlist[t].change > maxCh) { maxCh = watchlist[t].change; top = t; }
+    }
+    topAssetTicker = top;
+    if (!top) return;
+
+    let holdTime = "1–2 Weeks", ctx = "Stable accumulation trend.";
+    if (["BTC-USD","ETH-USD","SOL-USD"].includes(top)) { holdTime = "12–36 Hours"; ctx = "Short-term sentiment momentum."; }
+    else if (["NVDA","TSLA"].includes(top))             { holdTime = "3–5 Days";    ctx = "Mid-term trend continuation."; }
+
+    document.getElementById("trending-asset").innerText   = top;
+    document.getElementById("trending-holdtime").innerText = `Est. hold: ${holdTime}`;
+    document.getElementById("trending-reason").innerText   = `${ctx} Up ${maxCh.toFixed(2)}% in 24h.`;
+    document.getElementById("btn-inspect-top").removeAttribute("disabled");
+}
+
+function inspectTopAsset() { if (topAssetTicker) selectAndScan(topAssetTicker); }
+
+// ─── SCAN + AI ────────────────────────────────────────────────────────────────
+function selectAndScan(ticker) {
+    currentScanTicker = ticker;
+    for (const t in watchlist) {
+        const row = document.getElementById(`ticker-row-${t}`);
+        if (row) row.className = (t === ticker)
+            ? "transition cursor-pointer row-selected"
+            : "hover:bg-slate-900/40 transition cursor-pointer";
+    }
+    document.getElementById("current-scan-asset").innerText = `SCANNING: ${ticker}`;
+    document.getElementById("ai-idle-state").classList.add("hidden");
+    document.getElementById("ai-analysis-card").classList.add("hidden");
+    document.getElementById("ai-scanning-state").classList.remove("hidden");
+    runAIAnalysis(ticker);
+
+    // Restart auto-scan countdown if toggle is ON
+    if (document.getElementById("auto-scan-toggle").checked) {
+        startAIScanCountdown();
+    }
+}
+
+// ─── GEMINI 2.0 FLASH + GOOGLE SEARCH GROUNDING ─────────────────────────────
+async function runAIAnalysis(ticker) {
+    const price  = watchlist[ticker]?.price  ?? 0;
+    const change = watchlist[ticker]?.change ?? 0;
+    const apiKey = localStorage.getItem("gemini_key");
+
+    let result = null;
+
+    if (apiKey) {
+        try {
+            addLog(`[AI] Querying Gemini 2.0 Flash + Google Search for ${ticker}…`, "ai");
+
+            const prompt = `You are a professional quantitative analyst with real-time internet access.
+Search for the LATEST news, analyst ratings, earnings data, and market sentiment for ${ticker}.
+Current live data: Price = $${price.toFixed(2)}, 24h change = ${change.toFixed(2)}%
+
+Based on your web research, return ONLY a valid JSON object with exactly these keys:
+{
+  "action": "BUY" or "SELL" or "HOLD",
+  "confidence": integer 1-10,
+  "safety_rating": "SAFE" or "MODERATE" or "RISKY",
+  "take_profit_price": number (realistic target based on current price),
+  "stop_loss_price": number (realistic stop based on current price),
+  "reasoning": "2-3 sentences citing SPECIFIC news articles, analyst ratings, or data points you found"
+}
+
+Rules: take_profit > current price for BUY; stop_loss < current price for BUY. Return RAW JSON only. No markdown, no backticks.`;
+
+            const url  = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            const body = {
+                contents: [{ parts: [{ text: prompt }] }],
+                tools: [{ "google_search": {} }]
+            };
+
+            const res = await fetchWithRetry(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body)
+            }, 3, 800);
+
+            const data = await res.json();
+            // Extract text from all parts (grounding may split content)
+            const raw = (data.candidates?.[0]?.content?.parts ?? [])
+                .map(p => p.text || "").join("");
+            // Pull JSON from potentially surrounding text
+            const jsonMatch = raw.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                result = JSON.parse(jsonMatch[0]);
+                addLog(`[AI] Gemini web-grounded analysis complete for ${ticker}.`, "ai");
+            } else {
+                throw new Error("No JSON found in Gemini response.");
+            }
+
+        } catch (err) {
+            addLog(`[AI ERROR] ${err.message} — falling back to mock.`, "warning");
+            result = mockAnalysis(ticker, price, change);
+        }
+    } else {
+        addLog(`[AI] No Gemini key set — using mock analysis for ${ticker}. Add key in Setup Keys.`, "warning");
+        await new Promise(r => setTimeout(r, 1200));
+        result = mockAnalysis(ticker, price, change);
+    }
+
+    lastAIProposal = { ticker, price, ...result };
+    displayAIResult(lastAIProposal);
+}
+
+function mockAnalysis(ticker, price, change) {
+    let action = "HOLD";
+    let tpPct = 0.045, slPct = 0.02;
+    if (change < -2.0)      { action = "BUY";  tpPct = 0.06; slPct = 0.02; }
+    else if (change > 3.0)  { action = "SELL"; tpPct = 0.04; slPct = 0.015; }
+    else                    { action = Math.random() > 0.4 ? "BUY" : "HOLD"; }
+
+    const safety = change > 4 || change < -4 ? "RISKY" : (Math.random() > 0.4 ? "MODERATE" : "SAFE");
+
+    return {
+        action,
+        confidence:        Math.floor(Math.random() * 3) + 6,
+        safety_rating:     safety,
+        take_profit_price: parseFloat((price * (1 + tpPct)).toFixed(2)),
+        stop_loss_price:   parseFloat((price * (1 - slPct)).toFixed(2)),
+        reasoning: `[MOCK — add Gemini key for real web-based analysis] ${ticker} is showing ${change > 0 ? "positive" : "negative"} momentum at $${price.toFixed(2)}. Technical patterns suggest ${action} signal near current levels.`
+    };
+}
+
+function fetchWithRetry(url, options, retries = 3, delay = 800) {
+    return fetch(url, options).then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r;
+    }).catch(err => {
+        if (retries <= 0) throw err;
+        return new Promise(res => setTimeout(res, delay))
+            .then(() => fetchWithRetry(url, options, retries - 1, delay * 2));
+    });
+}
+
+// ─── AUTO AI SCAN ────────────────────────────────────────────────────────────
+function toggleAutoScan(enabled) {
+    if (aiScanInterval)  { clearInterval(aiScanInterval);  aiScanInterval  = null; }
+    if (aiCountdownTimer) { clearInterval(aiCountdownTimer); aiCountdownTimer = null; }
+    document.getElementById("ai-scan-countdown").innerText = "";
+
+    if (enabled && currentScanTicker) {
+        startAIScanCountdown();
+        addLog(`[AUTO-SCAN] ON — AI re-analyses ${currentScanTicker} every 30s.`, "info");
+    } else if (!enabled) {
+        addLog("[AUTO-SCAN] OFF.", "info");
+    }
+}
+
+function startAIScanCountdown() {
+    if (aiScanInterval)   { clearInterval(aiScanInterval);  }
+    if (aiCountdownTimer) { clearInterval(aiCountdownTimer); }
+    nextAIScan = 30;
+    document.getElementById("ai-scan-countdown").innerText = `(${nextAIScan}s)`;
+
+    aiScanInterval = setInterval(() => {
+        if (currentScanTicker) {
+            document.getElementById("ai-scanning-state").classList.remove("hidden");
+            document.getElementById("ai-analysis-card").classList.add("hidden");
+            runAIAnalysis(currentScanTicker);
+        }
+        nextAIScan = 30;
+    }, 30000);
+
+    aiCountdownTimer = setInterval(() => {
+        nextAIScan = Math.max(0, nextAIScan - 1);
+        const el = document.getElementById("ai-scan-countdown");
+        if (el) el.innerText = `(${nextAIScan}s)`;
+    }, 1000);
+}
+
+// ─── DISPLAY AI RESULT ───────────────────────────────────────────────────────
+function displayAIResult(p) {
+    document.getElementById("ai-scanning-state").classList.add("hidden");
+    document.getElementById("ai-analysis-card").classList.remove("hidden");
+
+    const bc = document.getElementById("badge-action-container");
+    const bi = document.getElementById("badge-action-icon");
+    const bt = document.getElementById("badge-action-text");
+
+    if (p.action === "BUY") {
+        bc.className = "p-3.5 rounded-xl border border-emerald-950 bg-emerald-500/5 flex items-center gap-3";
+        bi.className = "h-10 w-10 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center text-lg";
+        bt.innerText = "BUY"; bt.className = "font-bold text-emerald-400 text-sm";
+    } else if (p.action === "SELL") {
+        bc.className = "p-3.5 rounded-xl border border-rose-950 bg-rose-500/5 flex items-center gap-3";
+        bi.className = "h-10 w-10 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center text-lg";
+        bt.innerText = "SELL"; bt.className = "font-bold text-rose-400 text-sm";
+    } else {
+        bc.className = "p-3.5 rounded-xl border border-amber-950 bg-amber-500/5 flex items-center gap-3";
+        bi.className = "h-10 w-10 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center text-lg";
+        bt.innerText = "HOLD"; bt.className = "font-bold text-amber-400 text-sm";
+    }
+
+    const si = document.getElementById("badge-safety-icon");
+    const st = document.getElementById("badge-safety-text");
+    if (p.safety_rating === "SAFE") {
+        si.className = "h-10 w-10 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center text-lg";
+        st.className = "font-bold text-emerald-400 text-sm"; st.innerText = "SAFE";
+    } else if (p.safety_rating === "MODERATE") {
+        si.className = "h-10 w-10 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center text-lg";
+        st.className = "font-bold text-amber-400 text-sm"; st.innerText = "MODERATE";
+    } else {
+        si.className = "h-10 w-10 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center text-lg";
+        st.className = "font-bold text-rose-400 text-sm"; st.innerText = "HIGH RISK";
+    }
+
+    document.getElementById("badge-confidence-text").innerText = `${p.confidence}/10`;
+    document.getElementById("target-tp").innerText = `$${p.take_profit_price.toLocaleString(undefined,{minimumFractionDigits:2})}`;
+    document.getElementById("target-sl").innerText = `$${p.stop_loss_price.toLocaleString(undefined,{minimumFractionDigits:2})}`;
+    document.getElementById("ai-reasoning-text").innerText = p.reasoning;
+    addLog(`[AI] ${p.ticker} → ${p.action} | TP $${p.take_profit_price} | SL $${p.stop_loss_price} | Confidence ${p.confidence}/10`, "ai");
+}
+
+function rejectTrade() {
+    document.getElementById("ai-analysis-card").classList.add("hidden");
+    document.getElementById("ai-idle-state").classList.remove("hidden");
+    document.getElementById("current-scan-asset").innerText = "Ready";
+    lastAIProposal = null;
+}
+
+// ─── HOLDINGS (with localStorage persistence) ────────────────────────────────
+function saveHoldings() {
+    localStorage.setItem("copilot_holdings", JSON.stringify(holdings));
+    localStorage.setItem("copilot_balance",  portfolioBalance.toString());
+}
+
+function loadHoldings() {
+    try {
+        const h = localStorage.getItem("copilot_holdings");
+        const b = localStorage.getItem("copilot_balance");
+        if (h) holdings = JSON.parse(h);
+        if (b) portfolioBalance = parseFloat(b);
+    } catch (_) {}
+}
+
+function promptRecordManualBuy() {
+    if (!lastAIProposal) return;
+    document.getElementById("manual-add-ticker").value = lastAIProposal.ticker;
+    document.getElementById("manual-add-price").value  = lastAIProposal.price.toFixed(2);
+    document.getElementById("manual-add-qty").value    = "";
+    document.getElementById("manual-add-tp").value     = lastAIProposal.take_profit_price.toFixed(2);
+    document.getElementById("manual-add-sl").value     = lastAIProposal.stop_loss_price.toFixed(2);
+    toggleModal("modal-manual-add");
+}
+
+function submitManualPurchase() {
+    const rawTicker = document.getElementById("manual-add-ticker").value.trim().toUpperCase();
+    const price = parseFloat(document.getElementById("manual-add-price").value);
+    const qty   = parseFloat(document.getElementById("manual-add-qty").value);
+    const tp    = parseFloat(document.getElementById("manual-add-tp").value)  || price * 1.05;
+    const sl    = parseFloat(document.getElementById("manual-add-sl").value)  || price * 0.95;
+
+    if (!rawTicker || isNaN(price) || isNaN(qty) || price <= 0 || qty <= 0) {
+        showToast("Please fill ticker, price, and quantity.", false); return;
+    }
+
+    // Add to watchlist if it's a new ticker
+    if (!watchlist[rawTicker]) {
+        const isCrypto = rawTicker.includes("USD") || rawTicker === "BTC" || rawTicker === "ETH";
+        watchlist[rawTicker] = { price, change: 0, isCrypto };
+        initWatchlistTable();
+        addLog(`[WATCHLIST] Added new ticker: ${rawTicker}`, "info");
+    }
+
+    holdings[rawTicker] = { quantity: qty, entryPrice: price, targetTP: tp, targetSL: sl };
+    portfolioBalance -= price * qty;   // deduct cost from free cash
+
+    renderHoldingsList();
+    updateStats();
+    saveHoldings();
+
+    addLog(`[TRADE] Recorded BUY ${qty} × ${rawTicker} @ $${price.toFixed(2)} | TP $${tp.toFixed(2)} | SL $${sl.toFixed(2)}`, "trade-win");
+    showToast(`${rawTicker} position recorded!`);
+    sendTelegramMessage(`📈 <b>REVOLUT COPILOT — BUY RECORDED</b>\n\nAsset: ${rawTicker}\nQty: ${qty}\nEntry: $${price.toFixed(2)}\n🎯 TP: $${tp.toFixed(2)}\n🛡️ SL: $${sl.toFixed(2)}`);
+    toggleModal("modal-manual-add");
+}
+
+function renderHoldingsList() {
+    const list = document.getElementById("holdings-list");
+    const empty = document.getElementById("no-holdings-msg");
+    const keys  = Object.keys(holdings);
+
+    if (keys.length === 0) {
+        list.classList.add("hidden");
+        empty.classList.remove("hidden");
+        return;
+    }
+    empty.classList.add("hidden");
+    list.classList.remove("hidden");
+    list.innerHTML = "";
+
+    for (const ticker of keys) {
+        const pos = holdings[ticker];
+        const div = document.createElement("div");
+        div.className = "bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3";
+        div.innerHTML = `
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="font-bold text-slate-100">${ticker}</span>
+                    <span class="text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded font-mono">×${pos.quantity}</span>
+                </div>
+                <div class="grid grid-cols-3 gap-x-4 mt-1.5 text-[11px] text-slate-400 font-mono">
+                    <div>Entry: <span class="text-slate-300">$${pos.entryPrice.toFixed(2)}</span></div>
+                    <div>TP: <span class="text-emerald-400">$${pos.targetTP.toFixed(2)}</span></div>
+                    <div>SL: <span class="text-rose-400">$${pos.targetSL.toFixed(2)}</span></div>
+                </div>
+            </div>
+            <div class="flex items-center justify-between md:justify-end gap-4 border-t border-slate-900 md:border-0 pt-2.5 md:pt-0">
+                <div class="text-left md:text-right">
+                    <span class="text-[10px] text-slate-500 block uppercase font-bold tracking-wider">Live P&L</span>
+                    <span id="holding-pnl-${ticker}" class="text-xs font-semibold text-slate-400">—</span>
+                </div>
+                <button onclick="closeTrade('${ticker}','MANUAL CLOSE')" class="text-xs bg-slate-800 hover:bg-rose-500/10 hover:text-rose-400 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 hover:border-rose-500/20 transition">
+                    Record Sell
+                </button>
+            </div>`;
+        list.appendChild(div);
+    }
+}
+
+function monitorHolding(ticker) {
+    if (!holdings[ticker]) return;
+    const livePrice = watchlist[ticker]?.price;
+    if (!livePrice) return;
+    const pos = holdings[ticker];
+    const pnl = (livePrice - pos.entryPrice) * pos.quantity;
+    const pct = ((livePrice - pos.entryPrice) / pos.entryPrice) * 100;
+    const el  = document.getElementById(`holding-pnl-${ticker}`);
+    if (el) {
+        const sign = pnl >= 0 ? "+" : "";
+        el.innerText  = `${sign}$${pnl.toFixed(2)} (${sign}${pct.toFixed(2)}%)`;
+        el.className  = `text-xs font-semibold ${pnl >= 0 ? "text-emerald-400" : "text-rose-400"}`;
+    }
+    if (livePrice >= pos.targetTP) closeTrade(ticker, "✅ TAKE-PROFIT HIT — sell in Revolut now!");
+    if (livePrice <= pos.targetSL) closeTrade(ticker, "🛑 STOP-LOSS HIT — exit in Revolut now!");
+}
+
+function closeTrade(ticker, reason) {
+    const pos = holdings[ticker];
+    if (!pos) return;
+    const exitPrice = watchlist[ticker]?.price ?? pos.entryPrice;
+    const pnl       = (exitPrice - pos.entryPrice) * pos.quantity;
+
+    portfolioBalance += exitPrice * pos.quantity;
+    delete holdings[ticker];
+
+    renderHoldingsList();
+    updateStats();
+    saveHoldings();
+
+    const isWin = pnl >= 0;
+    addLog(`[CLOSE] ${ticker} @ $${exitPrice.toFixed(2)} — ${reason}. P&L: ${isWin ? "+" : ""}$${pnl.toFixed(2)}`, isWin ? "trade-win" : "trade-loss");
+    showToast(`${ticker} closed ${isWin ? "in profit" : "at loss"}: ${isWin ? "+" : ""}$${pnl.toFixed(2)}`, isWin);
+    sendTelegramMessage(`🚨 <b>REVOLUT EXIT ALERT</b>\n\nAsset: ${ticker}\n${reason}\nExit: $${exitPrice.toFixed(2)}\nP&L: ${isWin ? "+" : ""}$${pnl.toFixed(2)}`);
+}
+
+// ─── PORTFOLIO STATS ──────────────────────────────────────────────────────────
+function updateStats() {
+    let holdingsValue = 0;
+    for (const t in holdings) {
+        holdingsValue += (watchlist[t]?.price ?? holdings[t].entryPrice) * holdings[t].quantity;
+    }
+    const total = portfolioBalance + holdingsValue;
+    const pnl   = total - originalBalance;
+    const pct   = (pnl / originalBalance) * 100;
+    const sign  = pnl >= 0 ? "+" : "";
+
+    document.getElementById("stat-total-balance").innerText = `$${total.toLocaleString(undefined,{minimumFractionDigits:2})}`;
+    const pnlEl = document.getElementById("stat-pnl");
+    pnlEl.innerText   = `${sign}$${pnl.toLocaleString(undefined,{minimumFractionDigits:2})} (${sign}${pct.toFixed(2)}%)`;
+    pnlEl.className   = `font-semibold flex items-center gap-1 ${pnl >= 0 ? "text-emerald-400" : "text-rose-400"}`;
+
+    equityHistory.push(total);
+    if (equityHistory.length > 20) equityHistory.shift();
+    if (chartInstance) {
+        chartInstance.data.datasets[0].data = equityHistory.filter(v => v !== null);
+        chartInstance.update("none");
+    }
+}
+
+// ─── CHART ───────────────────────────────────────────────────────────────────
+function initChart() {
+    const ctx = document.getElementById("equityChart").getContext("2d");
+    chartInstance = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: Array.from({length:20}, (_,i) => `${(20-i)*10}s`),
+            datasets: [{
+                label: "Equity",
+                data: equityHistory,
+                borderColor: "#818cf8",
+                borderWidth: 2,
+                backgroundColor: "rgba(129,140,248,0.04)",
+                fill: true,
+                tension: 0.35,
+                pointRadius: 0,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { color: "#1e293b" }, ticks: { color: "#64748b", font: { size: 9 } } },
+                y: { grid: { color: "#1e293b" }, ticks: { color: "#64748b", font: { size: 9 },
+                    callback: v => "$" + v.toLocaleString(undefined,{maximumFractionDigits:0}) } }
+            }
+        }
+    });
+}
+
+// ─── SETTINGS ────────────────────────────────────────────────────────────────
+function saveSettings() {
+    const apiKey      = document.getElementById("input-api-key").value.trim();
+    const finnhubKey  = document.getElementById("input-finnhub-key").value.trim();
+    const tgToken     = document.getElementById("input-tg-token").value.trim();
+    const tgChat      = document.getElementById("input-tg-chat").value.trim();
+    const initBal     = parseFloat(document.getElementById("input-initial-balance").value);
+
+    if (apiKey)     localStorage.setItem("gemini_key",    apiKey);
+    if (finnhubKey) localStorage.setItem("finnhub_key",   finnhubKey);
+    if (tgToken)    localStorage.setItem("telegram_token", tgToken);
+    if (tgChat)     localStorage.setItem("telegram_chat",  tgChat);
+    if (!isNaN(initBal) && initBal > 0) {
+        localStorage.setItem("initial_balance", initBal.toString());
+        originalBalance  = initBal;
+        portfolioBalance = initBal;
+        updateStats();
+    }
+
+    showToast("Settings saved! Prices will now use live APIs.");
+    addLog("[SETTINGS] Configuration updated.", "info");
+    toggleModal("modal-settings");
+    refreshPrices();
+}
+
+function loadSettings() {
+    document.getElementById("input-api-key").value        = localStorage.getItem("gemini_key")      || "";
+    document.getElementById("input-finnhub-key").value    = localStorage.getItem("finnhub_key")     || "";
+    document.getElementById("input-tg-token").value       = localStorage.getItem("telegram_token")  || "";
+    document.getElementById("input-tg-chat").value        = localStorage.getItem("telegram_chat")   || "";
+
+    const initBal = parseFloat(localStorage.getItem("initial_balance") || "0");
+    if (initBal > 0) {
+        originalBalance = initBal;
+        document.getElementById("input-initial-balance").value = initBal;
+    }
+}
+
+// ─── TELEGRAM ────────────────────────────────────────────────────────────────
+async function sendTelegramMessage(text) {
+    const token = localStorage.getItem("telegram_token");
+    const chat  = localStorage.getItem("telegram_chat");
+    if (!token || !chat) return;
+    try {
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: chat, text, parse_mode: "HTML" })
+        });
+        addLog("[TELEGRAM] Alert sent.", "info");
+    } catch (e) {
+        addLog(`[TELEGRAM ERROR] ${e.message}`, "warning");
+    }
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function addLog(text, type = "system") {
+    const terminal = document.getElementById("terminal");
+    const now = new Date();
+    const time = `[${now.toTimeString().split(" ")[0]}]`;
+    let color = "text-slate-400";
+    if (type === "ai")         color = "text-indigo-400 font-medium";
+    if (type === "trade-win")  color = "text-emerald-400 font-bold";
+    if (type === "trade-loss") color = "text-rose-400 font-bold";
+    if (type === "warning")    color = "text-amber-400";
+    if (type === "info")       color = "text-cyan-400";
+
+    const row = document.createElement("div");
+    row.className = `leading-relaxed`;
+    row.innerHTML = `<span class="text-slate-600 font-mono text-[11px]">${time}</span> <span class="${color}">${text}</span>`;
+    terminal.appendChild(row);
+    terminal.scrollTop = terminal.scrollHeight;
+    // Keep terminal from growing too large
+    while (terminal.children.length > 120) terminal.removeChild(terminal.firstChild);
+}
+
+function clearLogs() {
+    document.getElementById("terminal").innerHTML = `<div class="text-slate-500">[system] Log cleared.</div>`;
+}
+
+function showToast(message, isSuccess = true) {
+    const toast = document.getElementById("toast");
+    document.getElementById("toast-msg").innerText = message;
+    document.getElementById("toast-icon").className = isSuccess
+        ? "fa-solid fa-circle-check text-emerald-400 text-base"
+        : "fa-solid fa-circle-exclamation text-rose-400 text-base";
+    toast.classList.remove("opacity-0", "pointer-events-none", "translate-y-2");
+    setTimeout(() => toast.classList.add("opacity-0", "pointer-events-none", "translate-y-2"), 3500);
+}
+
+function toggleModal(id) {
+    document.getElementById(id).classList.toggle("hidden");
+}
+
+function toggleInputType(id) {
+    const el = document.getElementById(id);
+    el.type = el.type === "password" ? "text" : "password";
+}
+
+function updateStatusLine(msg) {
+    document.getElementById("status-line").innerText = msg;
+}
+</script>
+</body>
+</html>
