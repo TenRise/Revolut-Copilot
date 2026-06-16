@@ -48,8 +48,8 @@
             <span class="font-semibold text-emerald-400 flex items-center gap-1" id="stat-pnl">—</span>
         </div>
         <div>
-            <span class="text-xs text-slate-400 block">Next Price Sync</span>
-            <span class="text-xs font-mono text-cyan-400" id="refresh-countdown">⟳ 10s</span>
+            <span class="text-xs text-slate-400 block">Last Price Sync</span>
+            <span class="text-xs font-mono text-cyan-400" id="last-sync-label">—</span>
         </div>
     </div>
 
@@ -79,89 +79,84 @@
                 <h2 class="font-bold text-slate-200 flex items-center gap-2">
                     <i class="fa-solid fa-globe text-indigo-400"></i> Live Watchlist
                 </h2>
-                <div class="flex flex-col items-end gap-2">
-                    <div class="flex items-center gap-3">
-                        <span class="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full flex items-center gap-1.5 font-mono" id="last-update-time">
-                            <span class="h-1.5 w-1.5 rounded-full bg-slate-500"></span> —
-                        </span>
-                        <div class="flex items-center gap-2">
-                            <span class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">AI Horizon</span>
-                            <div class="inline-flex items-center gap-1 bg-slate-900/80 border border-slate-800 rounded-full px-1.5 py-0.5">
-                                <button id="btn-horizon-day"
-                                        onclick="setAIIdeaHorizon('day')"
-                                        class="text-[10px] px-2 py-0.5 rounded-full border bg-indigo-600 text-white border-indigo-500 transition">
-                                    1D
-                                </button>
-                                <button id="btn-horizon-week"
-                                        onclick="setAIIdeaHorizon('week')"
-                                        class="text-[10px] px-2 py-0.5 rounded-full border bg-slate-900 text-slate-300 border-slate-700 transition">
-                                    1W
-                                </button>
-                                <button id="btn-horizon-month"
-                                        onclick="setAIIdeaHorizon('month')"
-                                        class="text-[10px] px-2 py-0.5 rounded-full border bg-slate-900 text-slate-300 border-slate-700 transition">
-                                    1M
-                                </button>
-                            </div>
-                            <button onclick="runHorizonAIScan()"
-                                    class="text-[11px] bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1.5 rounded-lg border border-indigo-500/70 transition flex items-center gap-1">
-                                <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
-                                AI Pick
-                            </button>
-                        </div>
-                    </div>
+                <div class="flex flex-col items-end gap-1.5">
+                    <span class="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full flex items-center gap-1.5 font-mono" id="last-update-time">
+                        <span class="h-1.5 w-1.5 rounded-full bg-slate-500"></span> —
+                    </span>
                     <div class="flex gap-2">
                         <input id="quick-add-ticker" type="text"
                                placeholder="Ticker (e.g. AAPL, BTC-USD)"
-                               class="w-36 bg-slate-950 border border-slate-800 rounded-lg py-1.5 px-2 text-[11px] font-mono text-slate-100 focus:outline-none focus:border-indigo-500 uppercase">
+                               class="w-32 bg-slate-950 border border-slate-800 rounded-lg py-1.5 px-2 text-[11px] font-mono text-slate-100 focus:outline-none focus:border-indigo-500 uppercase">
                         <button onclick="quickAddTicker()"
                                 class="text-[11px] bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white px-2.5 py-1.5 rounded-lg border border-slate-700 hover:border-indigo-500 transition">
                             Add
                         </button>
                     </div>
+                    <div class="flex gap-2 items-center">
+                        <select id="ai-top-horizon"
+                                class="bg-slate-950 border border-slate-800 rounded-lg py-1.5 px-2 text-[11px] text-slate-100 focus:outline-none focus:border-indigo-500">
+                            <option value="1D">Daily (1D)</option>
+                            <option value="1W">Weekly (1W)</option>
+                            <option value="1M">Monthly (1M)</option>
+                        </select>
+                        <button id="btn-ai-best-share"
+                                onclick="runTopIdeaScan('stock')"
+                                class="text-[11px] bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1.5 rounded-lg border border-indigo-500/80 transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
+                            AI Best Share
+                        </button>
+                        <button id="btn-ai-best-crypto"
+                                onclick="runTopIdeaScan('crypto')"
+                                class="text-[11px] bg-slate-800 hover:bg-purple-600 text-slate-200 hover:text-white px-2.5 py-1.5 rounded-lg border border-slate-700 hover:border-purple-500 transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
+                            AI Best Crypto
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <!-- Company shares watchlist -->
-            <div class="overflow-x-auto mb-4">
-                <div class="flex items-center justify-between mb-1">
-                    <span class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-1">
-                        <span class="h-1.5 w-1.5 rounded-full bg-sky-400"></span>
-                        Company Shares
-                    </span>
+            <div class="space-y-4 overflow-x-auto">
+                <!-- Company shares watchlist -->
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-1">
+                            <i class="fa-solid fa-building-columns text-indigo-400"></i>
+                            Company Shares
+                        </span>
+                    </div>
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="text-xs text-slate-400 border-b border-slate-800/80">
+                                <th class="pb-3 font-medium">Asset</th>
+                                <th class="pb-3 text-right font-medium">Price</th>
+                                <th class="pb-3 text-right font-medium">24h</th>
+                                <th class="pb-3 text-right font-medium">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="watchlist-body-stocks" class="divide-y divide-slate-800/50"></tbody>
+                    </table>
                 </div>
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="text-xs text-slate-400 border-b border-slate-800/80">
-                            <th class="pb-3 font-medium">Asset</th>
-                            <th class="pb-3 text-right font-medium">Price</th>
-                            <th class="pb-3 text-right font-medium">24h</th>
-                            <th class="pb-3 text-right font-medium">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="watchlist-body-stocks" class="divide-y divide-slate-800/50"></tbody>
-                </table>
-            </div>
 
-            <!-- Crypto watchlist -->
-            <div class="overflow-x-auto">
-                <div class="flex items-center justify-between mb-1">
-                    <span class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-1">
-                        <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
-                        Crypto
-                    </span>
+                <!-- Crypto watchlist -->
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-1">
+                            <i class="fa-brands fa-bitcoin text-amber-400"></i>
+                            Crypto Assets
+                        </span>
+                    </div>
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="text-xs text-slate-400 border-b border-slate-800/80">
+                                <th class="pb-3 font-medium">Asset</th>
+                                <th class="pb-3 text-right font-medium">Price</th>
+                                <th class="pb-3 text-right font-medium">24h</th>
+                                <th class="pb-3 text-right font-medium">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="watchlist-body-crypto" class="divide-y divide-slate-800/50"></tbody>
+                    </table>
                 </div>
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="text-xs text-slate-400 border-b border-slate-800/80">
-                            <th class="pb-3 font-medium">Asset</th>
-                            <th class="pb-3 text-right font-medium">Price</th>
-                            <th class="pb-3 text-right font-medium">24h</th>
-                            <th class="pb-3 text-right font-medium">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="watchlist-body-crypto" class="divide-y divide-slate-800/50"></tbody>
-                </table>
             </div>
         </div>
 
@@ -215,7 +210,7 @@
                 <h3 class="font-semibold text-slate-200 text-sm flex items-center gap-1.5">
                     <i class="fa-solid fa-chart-area text-purple-400"></i> Portfolio Equity Curve
                 </h3>
-            <span class="text-xs text-slate-400 font-medium">Auto-tracking</span>
+                <span class="text-xs text-slate-400 font-medium">Auto-tracking</span>
             </div>
             <div class="flex-1 relative min-h-0"><canvas id="equityChart"></canvas></div>
         </div>
@@ -392,7 +387,7 @@
                     <input type="password" id="input-finnhub-key" placeholder="cv…" class="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-3 pr-10 text-sm font-mono text-slate-100 focus:outline-none focus:border-indigo-500 transition">
                     <button onclick="toggleInputType('input-finnhub-key')" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-100"><i class="fa-regular fa-eye"></i></button>
                 </div>
-                <span class="block text-[10px] text-slate-500">Free at <a href="https://finnhub.io/register" target="_blank" class="text-cyan-400 underline">finnhub.io/register</a> (60 calls/min). Replaces broken Yahoo Finance. Crypto via CoinGecko (no key needed).</span>
+                <span class="block text-[10px] text-slate-500">Free at <a href="https://finnhub.io/register" target="_blank" class="text-cyan-400 underline">finnhub.io/register</a> (60 calls/min). Crypto via CoinGecko (no key needed).</span>
             </div>
 
             <!-- Telegram -->
@@ -480,20 +475,16 @@ let lastAIProposal    = null;
 let chartInstance     = null;
 let topAssetTicker    = null;
 let equityHistory     = new Array(20).fill(null);
-let aiIdeaHorizon     = "day";         // 'day' | 'week' | 'month' for focused AI stock scan
 
-// Timers
-let priceInterval     = null;   // 10-second price refresh
-let countdownInterval = null;   // 1-second UI countdown
+// Timers (AI auto-scan only)
 let aiScanInterval    = null;   // 30-second AI re-scan
 let aiCountdownTimer  = null;
-let nextPriceRefresh  = 10;
 let nextAIScan        = 30;
 
 // ─── WATCHLIST (initially empty; AI + manual) ───────────────────────────────
 let watchlist = {}; // { TICKER: { price, change, isCrypto } }
 
-// Last AI “top idea” from the market scan (for Top AI Momentum Pick)
+// Last AI “top idea” from any market scan (for Top AI Momentum Pick)
 let lastMarketScanTop = null; // { ticker, horizon, rationale }
 
 // ─── BOOT ────────────────────────────────────────────────────────────────────
@@ -503,52 +494,24 @@ window.onload = function () {
     renderHoldingsList();
     initWatchlistTable();
     initChart();
-    refreshPrices();        // immediate first fetch (if watchlist not empty)
-    startPriceAutoRefresh();
-    setAIIdeaHorizon(aiIdeaHorizon); // ensure horizon buttons are in known state
+    refreshPrices();        // one manual-style fetch at startup
     addLog("[BOOT] Revolut Copilot v2 active. Holdings and settings restored.", "info");
-    updateStatusLine("Live — auto price refresh; click Refresh for AI ideas.");
+    updateStatusLine("Manual — click Refresh for prices or AI buttons for ideas.");
 };
 
-// ─── AUTO PRICE REFRESH ──────────────────────────────────────────────────────
-function startPriceAutoRefresh() {
-    if (priceInterval)     clearInterval(priceInterval);
-    if (countdownInterval) clearInterval(countdownInterval);
-
-    nextPriceRefresh = 10;
-    updateCountdown();
-
-    priceInterval = setInterval(() => {
-        refreshPrices();
-        nextPriceRefresh = 10;
-    }, 10000);
-
-    countdownInterval = setInterval(() => {
-        nextPriceRefresh = Math.max(0, nextPriceRefresh - 1);
-        updateCountdown();
-    }, 1000);
-}
-
-function updateCountdown() {
-    const el = document.getElementById("refresh-countdown");
-    if (el) el.innerText = `⟳ ${nextPriceRefresh}s`;
-}
-
-// Manual refresh button = AI market scan + price refresh
+// ─── MANUAL PRICE REFRESH ONLY ───────────────────────────────────────────────
 async function manualRefresh() {
     const refreshIcon = document.getElementById("refresh-icon");
-    refreshIcon.classList.add("animate-spin");
+    if (refreshIcon) refreshIcon.classList.add("animate-spin");
     try {
-        await runMarketScan();   // AI proposes new ideas, fills/updates watchlist
-        await refreshPrices();   // refresh prices for all tickers
-        nextPriceRefresh = 10;
-        updateCountdown();
+        await refreshPrices();
+        updateStatusLine("Manual — prices refreshed.");
     } finally {
-        refreshIcon.classList.remove("animate-spin");
+        if (refreshIcon) refreshIcon.classList.remove("animate-spin");
     }
 }
 
-// ─── AI MARKET SCAN (Gemini + Search → hot BUY ideas) ───────────────────────
+// ─── AI MARKET SCAN (legacy multi-idea, optional) ───────────────────────────
 async function runMarketScan() {
     const apiKey = localStorage.getItem("gemini_key");
     if (!apiKey) {
@@ -643,59 +606,76 @@ Rules:
     }
 }
 
-// ─── FOCUSED AI PICK BY HORIZON (1D / 1W / 1M) ─────────────────────────────
-function setAIIdeaHorizon(horizon) {
-    aiIdeaHorizon = horizon;
-    const variants = ["day", "week", "month"];
-    for (const v of variants) {
-        const btn = document.getElementById(`btn-horizon-${v}`);
-        if (!btn) continue;
-        if (v === horizon) {
-            btn.classList.remove("bg-slate-900", "text-slate-300", "border-slate-700");
-            btn.classList.add("bg-indigo-600", "text-white", "border-indigo-500");
-        } else {
-            btn.classList.add("bg-slate-900", "text-slate-300", "border-slate-700");
-            btn.classList.remove("bg-indigo-600", "text-white", "border-indigo-500");
-        }
-    }
-}
-
-async function runHorizonAIScan() {
+// ─── AI TOP IDEA (ONE BEST SHARE OR CRYPTO BY HORIZON) ──────────────────────
+async function runTopIdeaScan(kind) {
     const apiKey = localStorage.getItem("gemini_key");
     if (!apiKey) {
-        addLog("[AI] No Gemini key set — cannot run focused horizon scan. Add key in Setup Keys.", "warning");
-        showToast("Add your Google Gemini API key under Setup Keys to use AI Pick.", false);
+        addLog("[AI] No Gemini key set — cannot search best idea. Add key in Setup Keys.", "warning");
+        showToast("Add a Gemini API key in Settings to use AI best picks.", false);
         return;
     }
 
-    const horizonDescriptor = aiIdeaHorizon === "day"
-        ? "the next 24 hours (intraday to 1-day horizon)"
-        : aiIdeaHorizon === "week"
-            ? "the next 5-7 trading days (short swing trade)"
-            : "the next 20-30 trading days (roughly one month swing trade)";
+    const horizonSel = document.getElementById("ai-top-horizon");
+    const mode = horizonSel ? horizonSel.value : "1D";
 
-    const horizonLabel = aiIdeaHorizon === "day" ? "1D" : aiIdeaHorizon === "week" ? "1W" : "1M";
+    let horizonText, horizonLabel;
+    if (mode === "1W") {
+        horizonText  = "the next 5–7 trading days (short swing trade)";
+        horizonLabel = "1 week";
+    } else if (mode === "1M") {
+        horizonText  = "the next 20–30 trading days (roughly one month position)";
+        horizonLabel = "1 month";
+    } else {
+        horizonText  = "the next 24 hours (intraday / very short term)";
+        horizonLabel = "1 day";
+    }
+
+    const isStock  = kind === "stock";
+    const buttonId = isStock ? "btn-ai-best-share" : "btn-ai-best-crypto";
+    const btn      = document.getElementById(buttonId);
+    if (btn) btn.disabled = true;
 
     try {
-        addLog(`[AI] Running focused ${horizonLabel} stock scan for single top idea…`, "ai");
-        updateStatusLine(`AI searching for a ${horizonLabel} opportunity…`);
+        const kindLabel = isStock ? "stock/ETF" : "crypto asset";
 
-        const prompt = `You are a professional equity strategist with real-time internet access.
-For ${horizonDescriptor}, select exactly ONE large- or mega-cap STOCK or ETF (no crypto, no penny stocks, no OTC).
-Optimise for risk-adjusted upside over this horizon.
+        addLog(`[AI] Searching for best ${kindLabel} to BUY for ${horizonLabel} horizon…`, "ai");
+        updateStatusLine(`AI searching best ${kindLabel} for ${horizonLabel}…`);
 
-Return ONLY a JSON object, with this exact shape:
+        let prompt;
+        if (isStock) {
+            prompt = `You are a professional equity strategist with real-time internet access.
+For ${horizonText}, select exactly ONE liquid, large- or mega-cap STOCK or ETF in developed markets (US/EU) that looks like the most attractive BUY candidate right now.
+
+Return ONLY JSON in this exact shape:
 {
   "ticker": "AAPL",
-  "horizon": "${horizonLabel}",
-  "expected_move_percent": 5.2,
-  "rationale": "2–3 sentences with specific catalysts, valuation arguments, and/or technical context, referencing RECENT news or data you found."
+  "horizon_label": "${horizonLabel}",
+  "rationale": "2–3 sentences with specific catalysts, valuation arguments and/or technical context tailored to a ${horizonLabel} holding period."
 }
 
 Rules:
-- Use liquid instruments that a provider like Finnhub recognises (e.g. AAPL, MSFT, NVDA, SPY, QQQ).
-- Only 1 idea.
-- JSON only, no markdown, no backticks, no additional commentary.`;
+- Use instruments that a provider like Finnhub recognises (e.g. AAPL, MSFT, NVDA, SPY, QQQ).
+- No OTC, no penny stocks, no extremely illiquid names.
+- Must be BUY-biased.
+- JSON only, no markdown, no backticks, no extra commentary.`;
+        } else {
+            prompt = `You are a professional crypto strategist with real-time internet access.
+For ${horizonText}, select exactly ONE liquid, large-cap crypto asset that looks like the most attractive BUY candidate right now.
+
+Ticker format MUST be like "BTC-USD", "ETH-USD", "SOL-USD", etc.
+
+Return ONLY JSON in this exact shape:
+{
+  "ticker": "BTC-USD",
+  "horizon_label": "${horizonLabel}",
+  "rationale": "2–3 sentences with specific catalysts, macro, on-chain or technical context tailored to a ${horizonLabel} holding period."
+}
+
+Rules:
+- Focus on major, liquid assets (top market cap).
+- Must be BUY-biased.
+- JSON only, no markdown, no backticks, no extra commentary.`;
+        }
 
         const url  = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
         const body = {
@@ -703,71 +683,69 @@ Rules:
             tools: [{ "google_search": {} }]
         };
 
-        const res = await fetchWithRetry(url, {
+        // Single call (no retries here) to reduce risk of multiple 429s
+        const res = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body)
-        }, 3, 800);
+        });
+
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+        }
 
         const data = await res.json();
         const raw  = (data.candidates?.[0]?.content?.parts ?? [])
             .map(p => p.text || "")
             .join("");
+
         const jsonMatch = raw.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new Error("No JSON object found in Gemini response.");
+
         const parsed = JSON.parse(jsonMatch[0]);
-
         const ticker = String(parsed.ticker || "").trim().toUpperCase();
-        const rationale = parsed.rationale || "AI-selected opportunity based on latest market data.";
-        if (!ticker) throw new Error("AI response missing ticker.");
+        if (!ticker) throw new Error("Gemini did not return a ticker symbol.");
 
-        // Ensure we treat this as an equity idea, not crypto
-        const looksCrypto = ticker.includes("USD") || ticker === "BTC" || ticker === "ETH" || ticker === "SOL";
-        if (looksCrypto) {
-            addLog("[AI] Horizon scan proposed a crypto-style symbol; forcing classification as equity watchlist entry.", "warning");
-        }
+        const rationale = parsed.rationale || "AI-selected BUY idea based on latest web-grounded data.";
+        const horizonFromModel = parsed.horizon_label || horizonLabel;
 
+        // Add to watchlist with proper classification
         if (!watchlist[ticker]) {
-            watchlist[ticker] = { price: 0, change: 0, isCrypto: false };
+            watchlist[ticker] = {
+                price:  0,
+                change: 0,
+                isCrypto: !isStock
+            };
         } else {
-            watchlist[ticker].isCrypto = false; // route into equities table
+            watchlist[ticker].isCrypto = !isStock;
         }
 
+        // Update Top AI Pick card
         lastMarketScanTop = {
             ticker,
-            horizon: parsed.horizon || horizonLabel,
+            horizon: horizonFromModel,
             rationale
         };
         updateTrendingFromAI();
-        initWatchlistTable();
-        await refreshPrices();
 
-        addLog(`[AI] Focused horizon scan top idea: ${ticker} (${horizonLabel}).`, "ai");
-        updateStatusLine("Live — AI watchlist updated with focused idea.");
-        showToast(`AI added ${ticker} as top ${horizonLabel} idea.`);
+        initWatchlistTable();
+        await refreshPrices(); // one manual-style refresh after AI idea
+
+        addLog(`[AI] Best ${kindLabel} idea (${horizonFromModel}): ${ticker}.`, "ai");
+        showToast(`AI suggests ${ticker} as best ${kindLabel} for ${horizonFromModel}.`);
+        updateStatusLine("Manual — AI idea added; prices refreshed.");
     } catch (err) {
-        addLog(`[AI ERROR] Horizon scan failed: ${err.message}`, "warning");
-        updateStatusLine("Live — horizon scan failed.");
-        showToast("AI horizon scan failed. Check the log for details.", false);
+        addLog(`[AI ERROR] Best-idea scan failed: ${err.message}`, "warning");
+        showToast("AI best-idea scan failed (see log).", false);
+        updateStatusLine("Manual — AI scan failed; prices only.");
+    } finally {
+        if (btn) btn.disabled = false;
     }
 }
 
 function updateTrendingFromAI() {
     if (!lastMarketScanTop) return;
-    let { ticker, horizon, rationale } = lastMarketScanTop;
-
-    let holdLabel = "";
-    if (typeof horizon === "number" && isFinite(horizon)) {
-        holdLabel = `${horizon} days`;
-    } else if (typeof horizon === "string" && horizon.trim() !== "") {
-        const h = horizon.trim().toUpperCase();
-        if (h === "1D") holdLabel = "1 day";
-        else if (h === "1W") holdLabel = "1 week";
-        else if (h === "1M") holdLabel = "1 month";
-        else holdLabel = horizon;
-    } else {
-        holdLabel = "few days";
-    }
+    const { ticker, horizon, rationale } = lastMarketScanTop;
 
     topAssetTicker = ticker;
     const assetEl = document.getElementById("trending-asset");
@@ -776,12 +754,12 @@ function updateTrendingFromAI() {
     const btn     = document.getElementById("btn-inspect-top");
 
     if (assetEl) assetEl.innerText = ticker;
-    if (holdEl)  holdEl.innerText  = `Est. hold: ${holdLabel}`;
+    if (holdEl)  holdEl.innerText  = `Est. hold: ${horizon}`;
     if (reasEl)  reasEl.innerText  = rationale;
     if (btn)     btn.removeAttribute("disabled");
 }
 
-// ─── FETCH LIVE PRICES ───────────────────────────────────────────────────────
+// ─── FETCH LIVE PRICES (MANUAL ONLY) ────────────────────────────────────────
 async function refreshPrices() {
     const refreshIcon = document.getElementById("refresh-icon");
     if (refreshIcon) refreshIcon.classList.add("animate-spin");
@@ -862,6 +840,8 @@ async function refreshPrices() {
             tsEl.innerHTML =
                 `<span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> ${now.toLocaleTimeString()}`;
         }
+        const syncEl = document.getElementById("last-sync-label");
+        if (syncEl) syncEl.innerText = now.toLocaleTimeString();
     }
 }
 
@@ -883,12 +863,37 @@ function initWatchlistTable() {
             <tr>
                 <td colspan="4" class="py-4 text-center text-xs text-slate-500">
                     No company shares in watchlist yet.<br/>
-                    Click <span class="font-semibold">Refresh Now</span> to let AI propose hot shares, or add a ticker above.
+                    Add a ticker above or click an AI button for ideas.
                 </td>
             </tr>`;
     } else {
         for (const ticker of stockSymbols) {
-            createWatchlistRow(ticker, tbodyStocks);
+            const a = watchlist[ticker];
+            const chColor = a.change >= 0 ? "text-emerald-400" : "text-rose-400";
+            const sign    = a.change >= 0 ? "+" : "";
+            const tr = document.createElement("tr");
+            tr.id        = `ticker-row-${ticker}`;
+            tr.className = "hover:bg-slate-900/40 transition cursor-pointer";
+            tr.onclick   = () => selectAndScan(ticker);
+            tr.innerHTML = `
+                <td class="py-3 font-bold text-slate-200">
+                    <div class="flex items-center gap-2">
+                        <span class="h-6 w-6 rounded bg-slate-850 flex items-center justify-center text-[10px] text-slate-400 border border-slate-800">
+                            S
+                        </span>
+                        ${ticker}
+                    </div>
+                </td>
+                <td class="py-3 text-right font-mono font-semibold" id="ticker-price-${ticker}">
+                    ${a.price ? "$" + a.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) : "—"}
+                </td>
+                <td class="py-3 text-right font-mono text-xs ${chColor}" id="ticker-change-${ticker}">
+                    ${isFinite(a.change) ? `${sign}${a.change.toFixed(2)}%` : "—"}
+                </td>
+                <td class="py-3 text-right">
+                    <button class="bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white px-2.5 py-1 rounded-md text-xs font-bold transition border border-indigo-500/20">Scan</button>
+                </td>`;
+            tbodyStocks.appendChild(tr);
         }
     }
 
@@ -897,43 +902,39 @@ function initWatchlistTable() {
             <tr>
                 <td colspan="4" class="py-4 text-center text-xs text-slate-500">
                     No crypto assets in watchlist yet.<br/>
-                    Add BTC-USD, ETH-USD, SOL-USD or other pairs manually above.
+                    Add BTC-USD, ETH-USD, SOL-USD or use the AI Best Crypto button.
                 </td>
             </tr>`;
     } else {
         for (const ticker of cryptoSymbols) {
-            createWatchlistRow(ticker, tbodyCrypto);
+            const a = watchlist[ticker];
+            const chColor = a.change >= 0 ? "text-emerald-400" : "text-rose-400";
+            const sign    = a.change >= 0 ? "+" : "";
+            const tr = document.createElement("tr");
+            tr.id        = `ticker-row-${ticker}`;
+            tr.className = "hover:bg-slate-900/40 transition cursor-pointer";
+            tr.onclick   = () => selectAndScan(ticker);
+            tr.innerHTML = `
+                <td class="py-3 font-bold text-slate-200">
+                    <div class="flex items-center gap-2">
+                        <span class="h-6 w-6 rounded bg-slate-850 flex items-center justify-center text-[10px] text-slate-400 border border-slate-800">
+                            ₿
+                        </span>
+                        ${ticker}
+                    </div>
+                </td>
+                <td class="py-3 text-right font-mono font-semibold" id="ticker-price-${ticker}">
+                    ${a.price ? "$" + a.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) : "—"}
+                </td>
+                <td class="py-3 text-right font-mono text-xs ${chColor}" id="ticker-change-${ticker}">
+                    ${isFinite(a.change) ? `${sign}${a.change.toFixed(2)}%` : "—"}
+                </td>
+                <td class="py-3 text-right">
+                    <button class="bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white px-2.5 py-1 rounded-md text-xs font-bold transition border border-indigo-500/20">Scan</button>
+                </td>`;
+            tbodyCrypto.appendChild(tr);
         }
     }
-}
-
-function createWatchlistRow(ticker, tbodyEl) {
-    const a = watchlist[ticker];
-    const chColor = a.change >= 0 ? "text-emerald-400" : "text-rose-400";
-    const sign    = a.change >= 0 ? "+" : "";
-    const tr = document.createElement("tr");
-    tr.id        = `ticker-row-${ticker}`;
-    tr.className = "hover:bg-slate-900/40 transition cursor-pointer";
-    tr.onclick   = () => selectAndScan(ticker);
-    tr.innerHTML = `
-        <td class="py-3 font-bold text-slate-200">
-            <div class="flex items-center gap-2">
-                <span class="h-6 w-6 rounded bg-slate-850 flex items-center justify-center text-[10px] text-slate-400 border border-slate-800">
-                    ${a.isCrypto ? '₿' : 'S'}
-                </span>
-                ${ticker}
-            </div>
-        </td>
-        <td class="py-3 text-right font-mono font-semibold" id="ticker-price-${ticker}">
-            ${a.price ? "$" + a.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) : "—"}
-        </td>
-        <td class="py-3 text-right font-mono text-xs ${chColor}" id="ticker-change-${ticker}">
-            ${isFinite(a.change) ? `${sign}${a.change.toFixed(2)}%` : "—"}
-        </td>
-        <td class="py-3 text-right">
-            <button class="bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white px-2.5 py-1 rounded-md text-xs font-bold transition border border-indigo-500/20">Scan</button>
-        </td>`;
-    tbodyEl.appendChild(tr);
 }
 
 function updateWatchlistUI() {
@@ -982,7 +983,7 @@ function quickAddTicker() {
     refreshPrices(); // fetch first live price when possible
 }
 
-// ─── TOP PICK ────────────────────────────────────────────────────────────────
+// ─── TOP PICK FALLBACK (IF NO AI TOP) ───────────────────────────────────────
 function determineTopPick() {
     // Prefer the last AI market scan result if available
     if (lastMarketScanTop) {
