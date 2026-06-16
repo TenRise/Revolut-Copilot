@@ -45,7 +45,7 @@
         </div>
         <div>
             <span class="text-xs text-slate-400 block">Unrealised P&amp;L</span>
-            <span class="font-semibold text-emerald-400 flex items-center gap-1" id="stat-pnl">—</span>
+            <span class="font-semibold flex items-center gap-1" id="stat-pnl">—</span>
         </div>
         <div>
             <span class="text-xs text-slate-400 block">Last Price Sync</span>
@@ -79,37 +79,37 @@
                 <h2 class="font-bold text-slate-200 flex items-center gap-2">
                     <i class="fa-solid fa-globe text-indigo-400"></i> Live Watchlist
                 </h2>
-                <div class="flex flex-col items-end gap-1.5">
+                <div class="flex flex-col items-end gap-2">
                     <span class="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full flex items-center gap-1.5 font-mono" id="last-update-time">
                         <span class="h-1.5 w-1.5 rounded-full bg-slate-500"></span> —
                     </span>
                     <div class="flex gap-2">
+                        <select id="ai-horizon"
+                                class="bg-slate-950 border border-slate-800 rounded-lg py-1.5 px-2 text-[11px] text-slate-100 focus:outline-none focus:border-indigo-500">
+                            <option value="1D">Horizon: Daily</option>
+                            <option value="1W">Horizon: Weekly</option>
+                            <option value="1M">Horizon: Monthly</option>
+                        </select>
+                        <button id="btn-ai-share"
+                                onclick="runAIPick('stock')"
+                                class="text-[11px] bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1.5 rounded-lg border border-indigo-500/80 transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
+                            AI Share Pick
+                        </button>
+                        <button id="btn-ai-crypto"
+                                onclick="runAIPick('crypto')"
+                                class="text-[11px] bg-slate-800 hover:bg-emerald-600 text-slate-200 hover:text-white px-2.5 py-1.5 rounded-lg border border-slate-700 hover:border-emerald-500 transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
+                            AI Crypto Pick
+                        </button>
+                    </div>
+                    <div class="flex gap-2">
                         <input id="quick-add-ticker" type="text"
                                placeholder="Ticker (e.g. AAPL, BTC-USD)"
-                               class="w-32 bg-slate-950 border border-slate-800 rounded-lg py-1.5 px-2 text-[11px] font-mono text-slate-100 focus:outline-none focus:border-indigo-500 uppercase">
+                               class="w-36 bg-slate-950 border border-slate-800 rounded-lg py-1.5 px-2 text-[11px] font-mono text-slate-100 focus:outline-none focus:border-indigo-500 uppercase">
                         <button onclick="quickAddTicker()"
                                 class="text-[11px] bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white px-2.5 py-1.5 rounded-lg border border-slate-700 hover:border-indigo-500 transition">
                             Add
-                        </button>
-                    </div>
-                    <div class="flex gap-2 items-center">
-                        <select id="ai-top-horizon"
-                                class="bg-slate-950 border border-slate-800 rounded-lg py-1.5 px-2 text-[11px] text-slate-100 focus:outline-none focus:border-indigo-500">
-                            <option value="1D">Daily (1D)</option>
-                            <option value="1W">Weekly (1W)</option>
-                            <option value="1M">Monthly (1M)</option>
-                        </select>
-                        <button id="btn-ai-best-share"
-                                onclick="runTopIdeaScan('stock')"
-                                class="text-[11px] bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1.5 rounded-lg border border-indigo-500/80 transition flex items-center gap-1.5">
-                            <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
-                            AI Best Share
-                        </button>
-                        <button id="btn-ai-best-crypto"
-                                onclick="runTopIdeaScan('crypto')"
-                                class="text-[11px] bg-slate-800 hover:bg-purple-600 text-slate-200 hover:text-white px-2.5 py-1.5 rounded-lg border border-slate-700 hover:border-purple-500 transition flex items-center gap-1.5">
-                            <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
-                            AI Best Crypto
                         </button>
                     </div>
                 </div>
@@ -225,7 +225,7 @@
                     <span class="text-[10px] font-mono text-slate-500 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">Gemini + Web Search</span>
                 </h2>
                 <div class="flex items-center gap-3">
-                    <!-- Auto-scan toggle -->
+                    <!-- Auto-scan toggle for per-ticker analysis -->
                     <label class="flex items-center gap-1.5 cursor-pointer select-none">
                         <span class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Auto-Scan</span>
                         <label class="relative inline-flex items-center cursor-pointer">
@@ -476,15 +476,15 @@ let chartInstance     = null;
 let topAssetTicker    = null;
 let equityHistory     = new Array(20).fill(null);
 
-// Timers (AI auto-scan only)
-let aiScanInterval    = null;   // 30-second AI re-scan
+// Timers for AI auto-scan (per-ticker)
+let aiScanInterval    = null;
 let aiCountdownTimer  = null;
 let nextAIScan        = 30;
 
-// ─── WATCHLIST (initially empty; AI + manual) ───────────────────────────────
+// ─── WATCHLIST (stocks + crypto) ────────────────────────────────────────────
 let watchlist = {}; // { TICKER: { price, change, isCrypto } }
 
-// Last AI “top idea” from any market scan (for Top AI Momentum Pick)
+// Last AI top idea (for Top AI Momentum Pick)
 let lastMarketScanTop = null; // { ticker, horizon, rationale }
 
 // ─── BOOT ────────────────────────────────────────────────────────────────────
@@ -494,129 +494,33 @@ window.onload = function () {
     renderHoldingsList();
     initWatchlistTable();
     initChart();
-    refreshPrices();        // one manual-style fetch at startup
+    refreshPrices();        // one initial price sync
     addLog("[BOOT] Revolut Copilot v2 active. Holdings and settings restored.", "info");
-    updateStatusLine("Manual — click Refresh for prices or AI buttons for ideas.");
+    updateStatusLine("Ready — click Refresh for prices or use AI Share/Crypto Pick.");
 };
 
-// ─── MANUAL PRICE REFRESH ONLY ───────────────────────────────────────────────
+// ─── MANUAL PRICE REFRESH (no auto timer) ───────────────────────────────────
 async function manualRefresh() {
     const refreshIcon = document.getElementById("refresh-icon");
     if (refreshIcon) refreshIcon.classList.add("animate-spin");
     try {
         await refreshPrices();
-        updateStatusLine("Manual — prices refreshed.");
     } finally {
         if (refreshIcon) refreshIcon.classList.remove("animate-spin");
     }
 }
 
-// ─── AI MARKET SCAN (legacy multi-idea, optional) ───────────────────────────
-async function runMarketScan() {
+// ─── AI PICK: TOP SHARE OR TOP CRYPTO ───────────────────────────────────────
+async function runAIPick(kind) {
     const apiKey = localStorage.getItem("gemini_key");
     if (!apiKey) {
-        addLog("[AI] No Gemini key set — skipping AI market scan. Add key in Setup Keys.", "warning");
+        addLog("[AI] No Gemini key set — cannot run AI pick. Add key in Setup Keys.", "warning");
+        showToast("Add your Gemini API key in Settings to use AI picks.", false);
         return;
     }
 
-    try {
-        addLog("[AI] Running AI market scan for short-term BUY ideas…", "ai");
-        updateStatusLine("AI scanning markets for BUY opportunities…");
-
-        const prompt = `You are a professional equity analyst with real-time internet access.
-Screen liquid, large- or mega-cap stocks and ETFs in developed markets (US/EU).
-Identify 5 instruments that look attractive BUY candidates for the next few trading days.
-
-Return ONLY JSON in this exact shape:
-{
-  "ideas": [
-    {
-      "ticker": "AAPL",
-      "horizon_days": 5,
-      "rationale": "1–2 sentences with concrete catalysts (earnings, guidance, sector move, technical setup, etc.)."
-    }
-  ]
-}
-
-Rules:
-- Use instruments that a typical data provider like Finnhub will recognise (e.g. AAPL, MSFT, NVDA, SPY).
-- No OTC, no penny stocks, no extremely illiquid names.
-- All ideas must be BUY-biased.
-- JSON only, no markdown or extra text.`;
-
-        const url  = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-        const body = {
-            contents: [{ parts: [{ text: prompt }] }],
-            tools: [{ "google_search": {} }]
-        };
-
-        const res  = await fetchWithRetry(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body)
-        }, 3, 800);
-
-        const data = await res.json();
-        const raw  = (data.candidates?.[0]?.content?.parts ?? [])
-            .map(p => p.text || "")
-            .join("");
-
-        const jsonMatch = raw.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error("No JSON object found in Gemini response.");
-
-        const parsed = JSON.parse(jsonMatch[0]);
-        const ideas  = Array.isArray(parsed.ideas) ? parsed.ideas : [];
-        if (!ideas.length) {
-            addLog("[AI] Market scan returned no BUY ideas.", "warning");
-            return;
-        }
-
-        let firstPick = null;
-
-        // Add AI ideas to watchlist (keep existing manual/holding tickers)
-        for (const idea of ideas) {
-            const t = String(idea.ticker || "").trim().toUpperCase();
-            if (!t) continue;
-            const isCrypto = t === "BTC-USD" || t === "ETH-USD" || t === "SOL-USD";
-
-            if (!watchlist[t]) {
-                watchlist[t] = { price: 0, change: 0, isCrypto };
-            }
-
-            if (!firstPick) {
-                firstPick = {
-                    ticker: t,
-                    horizon: idea.horizon_days || idea.horizon || "few days",
-                    rationale: idea.rationale || "AI-selected BUY idea based on latest market data."
-                };
-            }
-        }
-
-        if (firstPick) {
-            lastMarketScanTop = firstPick;
-            updateTrendingFromAI();
-        }
-
-        initWatchlistTable();
-        addLog(`[AI] Market scan updated watchlist with ${ideas.length} idea(s). Top: ${firstPick.ticker}`, "ai");
-        updateStatusLine("Live — AI watchlist refreshed.");
-    } catch (err) {
-        addLog(`[AI ERROR] Market scan failed: ${err.message}`, "warning");
-        updateStatusLine("Live — price refresh only (AI scan failed).");
-    }
-}
-
-// ─── AI TOP IDEA (ONE BEST SHARE OR CRYPTO BY HORIZON) ──────────────────────
-async function runTopIdeaScan(kind) {
-    const apiKey = localStorage.getItem("gemini_key");
-    if (!apiKey) {
-        addLog("[AI] No Gemini key set — cannot search best idea. Add key in Setup Keys.", "warning");
-        showToast("Add a Gemini API key in Settings to use AI best picks.", false);
-        return;
-    }
-
-    const horizonSel = document.getElementById("ai-top-horizon");
-    const mode = horizonSel ? horizonSel.value : "1D";
+    const horizonSel = document.getElementById("ai-horizon");
+    const mode = horizonSel ? horizonSel.value : "1D"; // "1D" | "1W" | "1M"
 
     let horizonText, horizonLabel;
     if (mode === "1W") {
@@ -630,51 +534,52 @@ async function runTopIdeaScan(kind) {
         horizonLabel = "1 day";
     }
 
-    const isStock  = kind === "stock";
-    const buttonId = isStock ? "btn-ai-best-share" : "btn-ai-best-crypto";
-    const btn      = document.getElementById(buttonId);
-    if (btn) btn.disabled = true;
+    const btnShare  = document.getElementById("btn-ai-share");
+    const btnCrypto = document.getElementById("btn-ai-crypto");
+    const isStock   = kind === "stock";
+
+    if (isStock && btnShare)  btnShare.disabled  = true;
+    if (!isStock && btnCrypto) btnCrypto.disabled = true;
 
     try {
-        const kindLabel = isStock ? "stock/ETF" : "crypto asset";
+        const assetLabel = isStock ? "stock/ETF" : "crypto asset";
 
-        addLog(`[AI] Searching for best ${kindLabel} to BUY for ${horizonLabel} horizon…`, "ai");
-        updateStatusLine(`AI searching best ${kindLabel} for ${horizonLabel}…`);
+        addLog(`[AI] Running qualitative ${assetLabel} scan for ${horizonLabel} horizon (top pick)…`, "ai");
+        updateStatusLine(`AI searching for top ${assetLabel} to BUY (${horizonLabel})…`);
 
         let prompt;
         if (isStock) {
-            prompt = `You are a professional equity strategist with real-time internet access.
-For ${horizonText}, select exactly ONE liquid, large- or mega-cap STOCK or ETF in developed markets (US/EU) that looks like the most attractive BUY candidate right now.
+            prompt = `You are a professional equity analyst with real-time internet access.
+For ${horizonText}, choose exactly ONE liquid, large- or mega-cap STOCK or ETF in developed markets (US/EU) that looks like the most attractive BUY candidate right now.
 
 Return ONLY JSON in this exact shape:
 {
   "ticker": "AAPL",
   "horizon_label": "${horizonLabel}",
-  "rationale": "2–3 sentences with specific catalysts, valuation arguments and/or technical context tailored to a ${horizonLabel} holding period."
+  "rationale": "2–3 sentences with concrete, qualitative justification (recent news, earnings, valuation, technical context) tailored to about ${horizonLabel} holding period."
 }
 
 Rules:
-- Use instruments that a provider like Finnhub recognises (e.g. AAPL, MSFT, NVDA, SPY, QQQ).
+- Use instruments that a typical data provider like Finnhub will recognise (e.g. AAPL, MSFT, NVDA, SPY, QQQ).
 - No OTC, no penny stocks, no extremely illiquid names.
-- Must be BUY-biased.
-- JSON only, no markdown, no backticks, no extra commentary.`;
+- The idea must be BUY-biased.
+- JSON only, no markdown or extra text.`;
         } else {
-            prompt = `You are a professional crypto strategist with real-time internet access.
-For ${horizonText}, select exactly ONE liquid, large-cap crypto asset that looks like the most attractive BUY candidate right now.
-
-Ticker format MUST be like "BTC-USD", "ETH-USD", "SOL-USD", etc.
+            prompt = `You are a professional crypto market analyst with real-time internet access.
+For ${horizonText}, choose exactly ONE major, liquid CRYPTO asset that looks like the most attractive BUY candidate right now.
 
 Return ONLY JSON in this exact shape:
 {
   "ticker": "BTC-USD",
   "horizon_label": "${horizonLabel}",
-  "rationale": "2–3 sentences with specific catalysts, macro, on-chain or technical context tailored to a ${horizonLabel} holding period."
+  "rationale": "2–3 sentences with qualitative reasoning (on-chain, macro, adoption, technical setup) tailored to about ${horizonLabel} holding period."
 }
 
 Rules:
-- Focus on major, liquid assets (top market cap).
-- Must be BUY-biased.
-- JSON only, no markdown, no backticks, no extra commentary.`;
+- Use major, liquid assets (e.g. BTC-USD, ETH-USD, SOL-USD, etc.).
+- Ticker format must be something like BTC-USD, ETH-USD, SOL-USD (quoted vs USD).
+- The idea must be BUY-biased.
+- JSON only, no markdown or extra text.`;
         }
 
         const url  = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
@@ -683,16 +588,14 @@ Rules:
             tools: [{ "google_search": {} }]
         };
 
-        // Single call (no retries here) to reduce risk of multiple 429s
+        // For this top-pick call, use direct fetch (no retry) to reduce repeated 429s
         const res = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body)
         });
 
-        if (!res.ok) {
-            throw new Error(`HTTP ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json();
         const raw  = (data.candidates?.[0]?.content?.parts ?? [])
@@ -704,23 +607,19 @@ Rules:
 
         const parsed = JSON.parse(jsonMatch[0]);
         const ticker = String(parsed.ticker || "").trim().toUpperCase();
-        if (!ticker) throw new Error("Gemini did not return a ticker symbol.");
+        if (!ticker) throw new Error("AI response missing ticker.");
 
-        const rationale = parsed.rationale || "AI-selected BUY idea based on latest web-grounded data.";
+        const rationale = parsed.rationale || `AI-selected ${assetLabel} based on latest qualitative signals for ~${horizonLabel}.`;
         const horizonFromModel = parsed.horizon_label || horizonLabel;
 
-        // Add to watchlist with proper classification
+        // Store in watchlist with correct classification
+        const isCrypto = !isStock;
         if (!watchlist[ticker]) {
-            watchlist[ticker] = {
-                price:  0,
-                change: 0,
-                isCrypto: !isStock
-            };
+            watchlist[ticker] = { price: 0, change: 0, isCrypto };
         } else {
-            watchlist[ticker].isCrypto = !isStock;
+            watchlist[ticker].isCrypto = isCrypto;
         }
 
-        // Update Top AI Pick card
         lastMarketScanTop = {
             ticker,
             horizon: horizonFromModel,
@@ -729,17 +628,18 @@ Rules:
         updateTrendingFromAI();
 
         initWatchlistTable();
-        await refreshPrices(); // one manual-style refresh after AI idea
+        await refreshPrices(); // get live price for the pick
 
-        addLog(`[AI] Best ${kindLabel} idea (${horizonFromModel}): ${ticker}.`, "ai");
-        showToast(`AI suggests ${ticker} as best ${kindLabel} for ${horizonFromModel}.`);
-        updateStatusLine("Manual — AI idea added; prices refreshed.");
+        addLog(`[AI] Top ${assetLabel} idea (${horizonFromModel}): ${ticker}.`, "ai");
+        updateStatusLine("Live — AI top idea added to watchlist.");
+        showToast(`AI suggests ${ticker} as top ${assetLabel} (${horizonFromModel}).`);
     } catch (err) {
-        addLog(`[AI ERROR] Best-idea scan failed: ${err.message}`, "warning");
-        showToast("AI best-idea scan failed (see log).", false);
-        updateStatusLine("Manual — AI scan failed; prices only.");
+        addLog(`[AI ERROR] AI pick failed: ${err.message}`, "warning");
+        showToast("AI pick failed (see log).", false);
+        updateStatusLine("Live — AI pick failed; prices only.");
     } finally {
-        if (btn) btn.disabled = false;
+        if (isStock && btnShare)  btnShare.disabled  = false;
+        if (!isStock && btnCrypto) btnCrypto.disabled = false;
     }
 }
 
@@ -759,11 +659,8 @@ function updateTrendingFromAI() {
     if (btn)     btn.removeAttribute("disabled");
 }
 
-// ─── FETCH LIVE PRICES (MANUAL ONLY) ────────────────────────────────────────
+// ─── FETCH LIVE PRICES (manual only) ────────────────────────────────────────
 async function refreshPrices() {
-    const refreshIcon = document.getElementById("refresh-icon");
-    if (refreshIcon) refreshIcon.classList.add("animate-spin");
-
     try {
         const symbols = Object.keys(watchlist);
         if (symbols.length === 0) {
@@ -773,7 +670,7 @@ async function refreshPrices() {
             return;
         }
 
-        // 1. CRYPTO — CoinGecko (only if any cryptos in watchlist)
+        // 1. CRYPTO — CoinGecko (if any cryptos)
         if (symbols.some(t => ["BTC-USD","ETH-USD","SOL-USD"].includes(t))) {
             const cgUrl = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true";
             const cgRes = await fetch(cgUrl);
@@ -795,7 +692,7 @@ async function refreshPrices() {
             }
         }
 
-        // 2. STOCKS — Finnhub (free, CORS-friendly, needs key)
+        // 2. STOCKS — Finnhub (needs key)
         const finnhubKey = localStorage.getItem("finnhub_key");
         if (finnhubKey && symbols.length > 0) {
             const stockSymbols = symbols.filter(t => !watchlist[t].isCrypto);
@@ -815,7 +712,7 @@ async function refreshPrices() {
             }
             if (successCount > 0) addLog(`[PRICE] ${successCount} stock quotes synced via Finnhub.`, "info");
         } else if (!finnhubKey && symbols.length > 0) {
-            // Gentle random drift if no Finnhub key — makes it obvious prices aren't real
+            // Simulated gentle drift if no Finnhub key
             const stocks = symbols.filter(t => !watchlist[t].isCrypto);
             for (const sym of stocks) {
                 const drift = (Math.random() - 0.48) * 0.003;
@@ -830,7 +727,6 @@ async function refreshPrices() {
     } catch (err) {
         addLog(`[PRICE ERROR] ${err.message}`, "warning");
     } finally {
-        if (refreshIcon) refreshIcon.classList.remove("animate-spin");
         updateWatchlistUI();
         determineTopPick();
         updateStats();
@@ -845,7 +741,7 @@ async function refreshPrices() {
     }
 }
 
-// ─── WATCHLIST UI (SEPARATE STOCK & CRYPTO TABLES) ──────────────────────────
+// ─── WATCHLIST UI (stocks + crypto) ─────────────────────────────────────────
 function initWatchlistTable() {
     const tbodyStocks = document.getElementById("watchlist-body-stocks");
     const tbodyCrypto = document.getElementById("watchlist-body-crypto");
@@ -863,7 +759,7 @@ function initWatchlistTable() {
             <tr>
                 <td colspan="4" class="py-4 text-center text-xs text-slate-500">
                     No company shares in watchlist yet.<br/>
-                    Add a ticker above or click an AI button for ideas.
+                    Add a ticker above or run <span class="font-semibold">AI Share Pick</span>.
                 </td>
             </tr>`;
     } else {
@@ -902,7 +798,7 @@ function initWatchlistTable() {
             <tr>
                 <td colspan="4" class="py-4 text-center text-xs text-slate-500">
                     No crypto assets in watchlist yet.<br/>
-                    Add BTC-USD, ETH-USD, SOL-USD or use the AI Best Crypto button.
+                    Add a ticker above (e.g. BTC-USD), or run <span class="font-semibold">AI Crypto Pick</span>.
                 </td>
             </tr>`;
     } else {
@@ -960,7 +856,7 @@ function updateWatchlistUI() {
     }
 }
 
-// Quick add ticker by share code (watchlist only)
+// Quick add ticker
 function quickAddTicker() {
     const input = document.getElementById("quick-add-ticker");
     if (!input) return;
@@ -980,18 +876,16 @@ function quickAddTicker() {
     addLog(`[WATCHLIST] Manually added ticker: ${raw}`, "info");
     showToast(`${raw} added to watchlist.`);
     input.value = "";
-    refreshPrices(); // fetch first live price when possible
+    refreshPrices(); // fetch price when possible
 }
 
-// ─── TOP PICK FALLBACK (IF NO AI TOP) ───────────────────────────────────────
+// ─── TOP PICK FALLBACK (no AI) ──────────────────────────────────────────────
 function determineTopPick() {
-    // Prefer the last AI market scan result if available
     if (lastMarketScanTop) {
         updateTrendingFromAI();
         return;
     }
 
-    // Fallback: purely based on 24h % change from current watchlist
     let top = null, maxCh = -Infinity;
     for (const t in watchlist) {
         const ch = watchlist[t].change;
@@ -1027,13 +921,12 @@ function selectAndScan(ticker) {
     document.getElementById("ai-scanning-state").classList.remove("hidden");
     runAIAnalysis(ticker);
 
-    // Restart auto-scan countdown if toggle is ON
     if (document.getElementById("auto-scan-toggle").checked) {
         startAIScanCountdown();
     }
 }
 
-// ─── GEMINI 2.0 FLASH + GOOGLE SEARCH GROUNDING ─────────────────────────────
+// ─── GEMINI ANALYSIS FOR A SINGLE TICKER ────────────────────────────────────
 async function runAIAnalysis(ticker) {
     const price  = watchlist[ticker]?.price  ?? 0;
     const change = watchlist[ticker]?.change ?? 0;
@@ -1054,8 +947,8 @@ Based on your web research, return ONLY a valid JSON object with exactly these k
   "action": "BUY" or "SELL" or "HOLD",
   "confidence": integer 1-10,
   "safety_rating": "SAFE" or "MODERATE" or "RISKY",
-  "take_profit_price": number (realistic target based on current price),
-  "stop_loss_price": number (realistic stop based on current price),
+  "take_profit_price": number,
+  "stop_loss_price": number,
   "reasoning": "2-3 sentences citing SPECIFIC news articles, analyst ratings, or data points you found"
 }
 
@@ -1067,11 +960,13 @@ Rules: take_profit > current price for BUY; stop_loss < current price for BUY. R
                 tools: [{ "google_search": {} }]
             };
 
-            const res = await fetchWithRetry(url, {
+            const res = await fetch(url, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body)
-            }, 3, 800);
+            });
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
             const data = await res.json();
             const raw  = (data.candidates?.[0]?.content?.parts ?? [])
@@ -1117,18 +1012,7 @@ function mockAnalysis(ticker, price, change) {
     };
 }
 
-function fetchWithRetry(url, options, retries = 3, delay = 800) {
-    return fetch(url, options).then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r;
-    }).catch(err => {
-        if (retries <= 0) throw err;
-        return new Promise(res => setTimeout(res, delay))
-            .then(() => fetchWithRetry(url, options, retries - 1, delay * 2));
-    });
-}
-
-// ─── AUTO AI SCAN (per-ticker) ───────────────────────────────────────────────
+// ─── AUTO AI SCAN (per-ticker, optional) ────────────────────────────────────
 function toggleAutoScan(enabled) {
     if (aiScanInterval)   { clearInterval(aiScanInterval);  aiScanInterval  = null; }
     if (aiCountdownTimer) { clearInterval(aiCountdownTimer); aiCountdownTimer = null; }
@@ -1214,7 +1098,7 @@ function rejectTrade() {
     lastAIProposal = null;
 }
 
-// ─── HOLDINGS (with localStorage persistence) ────────────────────────────────
+// ─── HOLDINGS (localStorage) ────────────────────────────────────────────────
 function saveHoldings() {
     localStorage.setItem("copilot_holdings", JSON.stringify(holdings));
     localStorage.setItem("copilot_balance",  portfolioBalance.toString());
@@ -1226,7 +1110,6 @@ function loadHoldings() {
         const b = localStorage.getItem("copilot_balance");
         if (h) {
             holdings = JSON.parse(h);
-            // Seed watchlist with held tickers
             for (const t in holdings) {
                 if (!watchlist[t]) {
                     const isCrypto = t.includes("USD") || t === "BTC" || t === "ETH" || t === "SOL";
@@ -1259,7 +1142,6 @@ function submitManualPurchase() {
         showToast("Please fill ticker, price, and quantity.", false); return;
     }
 
-    // Add to watchlist if it's a new ticker
     if (!watchlist[rawTicker]) {
         const isCrypto = rawTicker.includes("USD") || rawTicker === "BTC" || rawTicker === "ETH" || rawTicker === "SOL";
         watchlist[rawTicker] = { price, change: 0, isCrypto };
@@ -1268,7 +1150,7 @@ function submitManualPurchase() {
     }
 
     holdings[rawTicker] = { quantity: qty, entryPrice: price, targetTP: tp, targetSL: sl };
-    portfolioBalance -= price * qty;   // deduct cost from free cash
+    portfolioBalance -= price * qty;
 
     renderHoldingsList();
     updateStats();
@@ -1370,7 +1252,7 @@ Exit: $${exitPrice.toFixed(2)}
 P&L: ${isWin ? "+" : ""}$${pnl.toFixed(2)}`);
 }
 
-// ─── PORTFOLIO STATS ──────────────────────────────────────────────────────────
+// ─── PORTFOLIO STATS ─────────────────────────────────────────────────────────
 function updateStats() {
     let holdingsValue = 0;
     for (const t in holdings) {
@@ -1445,7 +1327,7 @@ function saveSettings() {
         updateStats();
     }
 
-    showToast("Settings saved! Prices will now use live APIs.");
+    showToast("Settings saved! Prices will now use live APIs when refreshed.");
     addLog("[SETTINGS] Configuration updated.", "info");
     toggleModal("modal-settings");
     refreshPrices();
@@ -1498,7 +1380,6 @@ function addLog(text, type = "system") {
     row.innerHTML = `<span class="text-slate-600 font-mono text-[11px]">${time}</span> <span class="${color}">${text}</span>`;
     terminal.appendChild(row);
     terminal.scrollTop = terminal.scrollHeight;
-    // Keep terminal from growing too large
     while (terminal.children.length > 120) terminal.removeChild(terminal.firstChild);
 }
 
