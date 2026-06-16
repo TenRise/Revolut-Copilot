@@ -75,13 +75,24 @@
 
         <!-- Watchlist -->
         <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-md">
-            <div class="flex items-center justify-between mb-4">
+            <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-4">
                 <h2 class="font-bold text-slate-200 flex items-center gap-2">
                     <i class="fa-solid fa-globe text-indigo-400"></i> Live Watchlist
                 </h2>
-                <span class="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full flex items-center gap-1.5 font-mono" id="last-update-time">
-                    <span class="h-1.5 w-1.5 rounded-full bg-slate-500"></span> —
-                </span>
+                <div class="flex flex-col items-end gap-1">
+                    <span class="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full flex items-center gap-1.5 font-mono" id="last-update-time">
+                        <span class="h-1.5 w-1.5 rounded-full bg-slate-500"></span> —
+                    </span>
+                    <div class="flex gap-2">
+                        <input id="quick-add-ticker" type="text"
+                               placeholder="Ticker (e.g. AAPL)"
+                               class="w-28 bg-slate-950 border border-slate-800 rounded-lg py-1.5 px-2 text-[11px] font-mono text-slate-100 focus:outline-none focus:border-indigo-500 uppercase">
+                        <button onclick="quickAddTicker()"
+                                class="text-[11px] bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white px-2.5 py-1.5 rounded-lg border border-slate-700 hover:border-indigo-500 transition">
+                            Add
+                        </button>
+                    </div>
+                </div>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
@@ -110,7 +121,7 @@
                         <span class="text-lg font-bold text-slate-100" id="trending-asset">—</span>
                         <span class="text-xs text-emerald-400 font-semibold" id="trending-holdtime"></span>
                     </div>
-                    <span class="text-xs text-slate-300 block mt-1" id="trending-reason">Waiting for first price sync…</span>
+                    <span class="text-xs text-slate-300 block mt-1" id="trending-reason">Waiting for first AI scan…</span>
                 </div>
                 <button id="btn-inspect-top" onclick="inspectTopAsset()" disabled class="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold py-2.5 px-3 rounded-lg transition whitespace-nowrap">
                     AI Deep Scan
@@ -422,33 +433,28 @@ let aiCountdownTimer  = null;
 let nextPriceRefresh  = 10;
 let nextAIScan        = 30;
 
-// ─── WATCHLIST (editable at runtime) ────────────────────────────────────────
-const watchlist = {
-    "AAPL":    { price: 213.00,  change: 0.80,  isCrypto: false },
-    "TSLA":    { price: 178.00,  change: -1.20, isCrypto: false },
-    "NVDA":    { price: 875.00,  change: 2.10,  isCrypto: false },
-    "MSFT":    { price: 420.00,  change: 0.40,  isCrypto: false },
-    "BTC-USD": { price: 65000,   change: 1.50,  isCrypto: true  },
-    "ETH-USD": { price: 3400,    change: 0.90,  isCrypto: true  },
-    "SOL-USD": { price: 145,     change: -2.30, isCrypto: true  },
-};
+// ─── WATCHLIST (initially empty; AI + manual) ───────────────────────────────
+let watchlist = {}; // { TICKER: { price, change, isCrypto } }
+
+// Last AI “top idea” from the market scan (for Top AI Momentum Pick)
+let lastMarketScanTop = null; // { ticker, horizon, rationale }
 
 // ─── BOOT ────────────────────────────────────────────────────────────────────
 window.onload = function () {
     loadSettings();
-    loadHoldings();         // ← persisted from last session
+    loadHoldings();         // seeds watchlist with held tickers
     renderHoldingsList();
     initWatchlistTable();
     initChart();
-    refreshPrices();        // immediate first fetch
+    refreshPrices();        // immediate first fetch (if watchlist not empty)
     startPriceAutoRefresh();
     addLog("[BOOT] Revolut Copilot v2 active. Holdings and settings restored.", "info");
-    updateStatusLine("Live — auto-refreshing every 10s");
+    updateStatusLine("Live — auto price refresh; click Refresh for AI ideas.");
 };
 
 // ─── AUTO PRICE REFRESH ──────────────────────────────────────────────────────
 function startPriceAutoRefresh() {
-    if (priceInterval)    clearInterval(priceInterval);
+    if (priceInterval)     clearInterval(priceInterval);
     if (countdownInterval) clearInterval(countdownInterval);
 
     nextPriceRefresh = 10;
@@ -470,33 +476,171 @@ function updateCountdown() {
     if (el) el.innerText = `⟳ ${nextPriceRefresh}s`;
 }
 
-// Manual refresh button
-function manualRefresh() {
-    refreshPrices();
-    nextPriceRefresh = 10;
+// Manual refresh button = AI market scan + price refresh
+async function manualRefresh() {
+    const refreshIcon = document.getElementById("refresh-icon");
+    refreshIcon.classList.add("animate-spin");
+    try {
+        await runMarketScan();   // AI proposes new ideas, fills/updates watchlist
+        await refreshPrices();   // refresh prices for all tickers
+        nextPriceRefresh = 10;
+        updateCountdown();
+    } finally {
+        refreshIcon.classList.remove("animate-spin");
+    }
+}
+
+// ─── AI MARKET SCAN (Gemini + Search → hot BUY ideas) ───────────────────────
+async function runMarketScan() {
+    const apiKey = localStorage.getItem("gemini_key");
+    if (!apiKey) {
+        addLog("[AI] No Gemini key set — skipping AI market scan. Add key in Setup Keys.", "warning");
+        return;
+    }
+
+    try {
+        addLog("[AI] Running AI market scan for short-term BUY ideas…", "ai");
+        updateStatusLine("AI scanning markets for BUY opportunities…");
+
+        const prompt = `You are a professional equity analyst with real-time internet access.
+Screen liquid, large- or mega-cap stocks and ETFs in developed markets (US/EU).
+Identify 5 instruments that look attractive BUY candidates for the next few trading days.
+
+Return ONLY JSON in this exact shape:
+{
+  "ideas": [
+    {
+      "ticker": "AAPL",
+      "horizon_days": 5,
+      "rationale": "1–2 sentences with concrete catalysts (earnings, guidance, sector move, technical setup, etc.)."
+    }
+  ]
+}
+
+Rules:
+- Use instruments that a typical data provider like Finnhub will recognise (e.g. AAPL, MSFT, NVDA, SPY).
+- No OTC, no penny stocks, no extremely illiquid names.
+- All ideas must be BUY-biased.
+- JSON only, no markdown or extra text.`;
+
+        const url  = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        const body = {
+            contents: [{ parts: [{ text: prompt }] }],
+            tools: [{ "google_search": {} }]
+        };
+
+        const res  = await fetchWithRetry(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        }, 3, 800);
+
+        const data = await res.json();
+        const raw  = (data.candidates?.[0]?.content?.parts ?? [])
+            .map(p => p.text || "")
+            .join("");
+
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error("No JSON object found in Gemini response.");
+
+        const parsed = JSON.parse(jsonMatch[0]);
+        const ideas  = Array.isArray(parsed.ideas) ? parsed.ideas : [];
+        if (!ideas.length) {
+            addLog("[AI] Market scan returned no BUY ideas.", "warning");
+            return;
+        }
+
+        let firstPick = null;
+
+        // Add AI ideas to watchlist (keep existing manual/holding tickers)
+        for (const idea of ideas) {
+            const t = String(idea.ticker || "").trim().toUpperCase();
+            if (!t) continue;
+            const isCrypto = t === "BTC-USD" || t === "ETH-USD" || t === "SOL-USD";
+
+            if (!watchlist[t]) {
+                watchlist[t] = { price: 0, change: 0, isCrypto };
+            }
+
+            if (!firstPick) {
+                firstPick = {
+                    ticker: t,
+                    horizon: idea.horizon_days || idea.horizon || "few days",
+                    rationale: idea.rationale || "AI-selected BUY idea based on latest market data."
+                };
+            }
+        }
+
+        if (firstPick) {
+            lastMarketScanTop = firstPick;
+            updateTrendingFromAI();
+        }
+
+        initWatchlistTable();
+        addLog(`[AI] Market scan updated watchlist with ${ideas.length} idea(s). Top: ${firstPick.ticker}`, "ai");
+        updateStatusLine("Live — AI watchlist refreshed.");
+    } catch (err) {
+        addLog(`[AI ERROR] Market scan failed: ${err.message}`, "warning");
+        updateStatusLine("Live — price refresh only (AI scan failed).");
+    }
+}
+
+function updateTrendingFromAI() {
+    if (!lastMarketScanTop) return;
+    const { ticker, horizon, rationale } = lastMarketScanTop;
+
+    topAssetTicker = ticker;
+    const assetEl = document.getElementById("trending-asset");
+    const holdEl  = document.getElementById("trending-holdtime");
+    const reasEl  = document.getElementById("trending-reason");
+    const btn     = document.getElementById("btn-inspect-top");
+
+    if (assetEl) assetEl.innerText = ticker;
+    if (holdEl)  holdEl.innerText  = `Est. hold: ${horizon}`;
+    if (reasEl)  reasEl.innerText  = rationale;
+    if (btn)     btn.removeAttribute("disabled");
 }
 
 // ─── FETCH LIVE PRICES ───────────────────────────────────────────────────────
 async function refreshPrices() {
     const refreshIcon = document.getElementById("refresh-icon");
-    refreshIcon.classList.add("animate-spin");
+    if (refreshIcon) refreshIcon.classList.add("animate-spin");
 
     try {
-        // 1. CRYPTO — CoinGecko (free, no key, no CORS issues)
-        const cgUrl = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true";
-        const cgRes = await fetch(cgUrl);
-        if (cgRes.ok) {
-            const d = await cgRes.json();
-            if (d.bitcoin)  { watchlist["BTC-USD"].price = d.bitcoin.usd;   watchlist["BTC-USD"].change = d.bitcoin.usd_24h_change;   }
-            if (d.ethereum) { watchlist["ETH-USD"].price = d.ethereum.usd;  watchlist["ETH-USD"].change = d.ethereum.usd_24h_change;  }
-            if (d.solana)   { watchlist["SOL-USD"].price = d.solana.usd;    watchlist["SOL-USD"].change = d.solana.usd_24h_change;    }
-            addLog("[PRICE] Crypto synced via CoinGecko.", "info");
+        const symbols = Object.keys(watchlist);
+        if (symbols.length === 0) {
+            updateWatchlistUI();
+            determineTopPick();
+            updateStats();
+            return;
+        }
+
+        // 1. CRYPTO — CoinGecko (only if any cryptos in watchlist)
+        if (symbols.some(t => ["BTC-USD","ETH-USD","SOL-USD"].includes(t))) {
+            const cgUrl = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true";
+            const cgRes = await fetch(cgUrl);
+            if (cgRes.ok) {
+                const d = await cgRes.json();
+                if (d.bitcoin && watchlist["BTC-USD"])  {
+                    watchlist["BTC-USD"].price  = d.bitcoin.usd;
+                    watchlist["BTC-USD"].change = d.bitcoin.usd_24h_change;
+                }
+                if (d.ethereum && watchlist["ETH-USD"]) {
+                    watchlist["ETH-USD"].price  = d.ethereum.usd;
+                    watchlist["ETH-USD"].change = d.ethereum.usd_24h_change;
+                }
+                if (d.solana && watchlist["SOL-USD"])   {
+                    watchlist["SOL-USD"].price  = d.solana.usd;
+                    watchlist["SOL-USD"].change = d.solana.usd_24h_change;
+                }
+                addLog("[PRICE] Crypto synced via CoinGecko.", "info");
+            }
         }
 
         // 2. STOCKS — Finnhub (free, CORS-friendly, needs key)
         const finnhubKey = localStorage.getItem("finnhub_key");
-        if (finnhubKey) {
-            const stockSymbols = Object.keys(watchlist).filter(t => !watchlist[t].isCrypto);
+        if (finnhubKey && symbols.length > 0) {
+            const stockSymbols = symbols.filter(t => !watchlist[t].isCrypto);
             let successCount = 0;
             for (const sym of stockSymbols) {
                 try {
@@ -512,27 +656,32 @@ async function refreshPrices() {
                 } catch (_) {}
             }
             if (successCount > 0) addLog(`[PRICE] ${successCount} stock quotes synced via Finnhub.`, "info");
-        } else {
+        } else if (!finnhubKey && symbols.length > 0) {
             // Gentle random drift if no Finnhub key — makes it obvious prices aren't real
-            const stocks = Object.keys(watchlist).filter(t => !watchlist[t].isCrypto);
+            const stocks = symbols.filter(t => !watchlist[t].isCrypto);
             for (const sym of stocks) {
                 const drift = (Math.random() - 0.48) * 0.003;
-                watchlist[sym].price  *= (1 + drift);
-                watchlist[sym].change  = parseFloat((watchlist[sym].change + (Math.random() - 0.5) * 0.1).toFixed(2));
+                watchlist[sym].price  = (watchlist[sym].price || 100) * (1 + drift);
+                watchlist[sym].change = parseFloat(((watchlist[sym].change || 0) + (Math.random() - 0.5) * 0.1).toFixed(2));
             }
-            addLog("[PRICE] No Finnhub key — stock prices are simulated. Add key in Setup Keys.", "warning");
+            if (stocks.length > 0) {
+                addLog("[PRICE] No Finnhub key — stock prices are simulated. Add key in Setup Keys.", "warning");
+            }
         }
 
     } catch (err) {
         addLog(`[PRICE ERROR] ${err.message}`, "warning");
     } finally {
-        refreshIcon.classList.remove("animate-spin");
+        if (refreshIcon) refreshIcon.classList.remove("animate-spin");
         updateWatchlistUI();
         determineTopPick();
         updateStats();
         const now = new Date();
-        document.getElementById("last-update-time").innerHTML =
-            `<span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> ${now.toLocaleTimeString()}`;
+        const tsEl = document.getElementById("last-update-time");
+        if (tsEl) {
+            tsEl.innerHTML =
+                `<span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> ${now.toLocaleTimeString()}`;
+        }
     }
 }
 
@@ -540,7 +689,20 @@ async function refreshPrices() {
 function initWatchlistTable() {
     const tbody = document.getElementById("watchlist-body");
     tbody.innerHTML = "";
-    for (const ticker in watchlist) {
+
+    const symbols = Object.keys(watchlist);
+    if (symbols.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="py-6 text-center text-xs text-slate-500">
+                    No assets in watchlist yet.<br/>
+                    Click <span class="font-semibold">Refresh Now</span> to let AI propose hot shares, or add a ticker above.
+                </td>
+            </tr>`;
+        return;
+    }
+
+    for (const ticker of symbols) {
         const a = watchlist[ticker];
         const chColor = a.change >= 0 ? "text-emerald-400" : "text-rose-400";
         const sign    = a.change >= 0 ? "+" : "";
@@ -551,12 +713,18 @@ function initWatchlistTable() {
         tr.innerHTML = `
             <td class="py-3 font-bold text-slate-200">
                 <div class="flex items-center gap-2">
-                    <span class="h-6 w-6 rounded bg-slate-850 flex items-center justify-center text-[10px] text-slate-400 border border-slate-800">${a.isCrypto ? '₿' : 'S'}</span>
+                    <span class="h-6 w-6 rounded bg-slate-850 flex items-center justify-center text-[10px] text-slate-400 border border-slate-800">
+                        ${a.isCrypto ? '₿' : 'S'}
+                    </span>
                     ${ticker}
                 </div>
             </td>
-            <td class="py-3 text-right font-mono font-semibold" id="ticker-price-${ticker}">$${a.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
-            <td class="py-3 text-right font-mono text-xs ${chColor}" id="ticker-change-${ticker}">${sign}${a.change.toFixed(2)}%</td>
+            <td class="py-3 text-right font-mono font-semibold" id="ticker-price-${ticker}">
+                ${a.price ? "$" + a.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) : "—"}
+            </td>
+            <td class="py-3 text-right font-mono text-xs ${chColor}" id="ticker-change-${ticker}">
+                ${isFinite(a.change) ? `${sign}${a.change.toFixed(2)}%` : "—"}
+            </td>
             <td class="py-3 text-right">
                 <button class="bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white px-2.5 py-1 rounded-md text-xs font-bold transition border border-indigo-500/20">Scan</button>
             </td>`;
@@ -565,24 +733,64 @@ function initWatchlistTable() {
 }
 
 function updateWatchlistUI() {
-    for (const ticker in watchlist) {
+    const symbols = Object.keys(watchlist);
+    if (symbols.length === 0) {
+        initWatchlistTable();
+        return;
+    }
+    for (const ticker of symbols) {
         const a  = watchlist[ticker];
         const pe = document.getElementById(`ticker-price-${ticker}`);
         const ce = document.getElementById(`ticker-change-${ticker}`);
-        if (!pe) { initWatchlistTable(); return; }
-        pe.innerText  = `$${a.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+        if (!pe || !ce) { initWatchlistTable(); return; }
+        pe.innerText  = a.price
+            ? `$${a.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`
+            : "—";
         const sign = a.change >= 0 ? "+" : "";
-        ce.innerText  = `${sign}${a.change.toFixed(2)}%`;
-        ce.className  = `py-3 text-right font-mono text-xs ${a.change >= 0 ? "text-emerald-400" : "text-rose-400"}`;
+        ce.innerText  = isFinite(a.change) ? `${sign}${a.change.toFixed(2)}%` : "—";
+        ce.className  = `py-3 text-right font-mono text-xs ${
+            isFinite(a.change) ? (a.change >= 0 ? "text-emerald-400" : "text-rose-400") : "text-slate-500"
+        }`;
         monitorHolding(ticker);
     }
 }
 
+// Quick add ticker by share code (watchlist only)
+function quickAddTicker() {
+    const input = document.getElementById("quick-add-ticker");
+    if (!input) return;
+    const raw = input.value.trim().toUpperCase();
+    if (!raw) {
+        showToast("Enter a ticker (share code) to add.", false);
+        return;
+    }
+    if (watchlist[raw]) {
+        showToast(`${raw} is already in your watchlist.`, false);
+        input.value = "";
+        return;
+    }
+    const isCrypto = raw.includes("USD") || raw === "BTC" || raw === "ETH" || raw === "SOL";
+    watchlist[raw] = { price: 0, change: 0, isCrypto };
+    initWatchlistTable();
+    addLog(`[WATCHLIST] Manually added ticker: ${raw}`, "info");
+    showToast(`${raw} added to watchlist.`);
+    input.value = "";
+    refreshPrices(); // fetch first live price when possible
+}
+
 // ─── TOP PICK ────────────────────────────────────────────────────────────────
 function determineTopPick() {
+    // Prefer the last AI market scan result if available
+    if (lastMarketScanTop) {
+        updateTrendingFromAI();
+        return;
+    }
+
+    // Fallback: purely based on 24h % change from current watchlist
     let top = null, maxCh = -Infinity;
     for (const t in watchlist) {
-        if (watchlist[t].change > maxCh) { maxCh = watchlist[t].change; top = t; }
+        const ch = watchlist[t].change;
+        if (isFinite(ch) && ch > maxCh) { maxCh = ch; top = t; }
     }
     topAssetTicker = top;
     if (!top) return;
@@ -591,7 +799,7 @@ function determineTopPick() {
     if (["BTC-USD","ETH-USD","SOL-USD"].includes(top)) { holdTime = "12–36 Hours"; ctx = "Short-term sentiment momentum."; }
     else if (["NVDA","TSLA"].includes(top))             { holdTime = "3–5 Days";    ctx = "Mid-term trend continuation."; }
 
-    document.getElementById("trending-asset").innerText   = top;
+    document.getElementById("trending-asset").innerText    = top;
     document.getElementById("trending-holdtime").innerText = `Est. hold: ${holdTime}`;
     document.getElementById("trending-reason").innerText   = `${ctx} Up ${maxCh.toFixed(2)}% in 24h.`;
     document.getElementById("btn-inspect-top").removeAttribute("disabled");
@@ -599,7 +807,7 @@ function determineTopPick() {
 
 function inspectTopAsset() { if (topAssetTicker) selectAndScan(topAssetTicker); }
 
-// ─── SCAN + AI ────────────────────────────────────────────────────────────────
+// ─── SCAN + AI (per-ticker deep dive) ───────────────────────────────────────
 function selectAndScan(ticker) {
     currentScanTicker = ticker;
     for (const t in watchlist) {
@@ -661,10 +869,8 @@ Rules: take_profit > current price for BUY; stop_loss < current price for BUY. R
             }, 3, 800);
 
             const data = await res.json();
-            // Extract text from all parts (grounding may split content)
-            const raw = (data.candidates?.[0]?.content?.parts ?? [])
+            const raw  = (data.candidates?.[0]?.content?.parts ?? [])
                 .map(p => p.text || "").join("");
-            // Pull JSON from potentially surrounding text
             const jsonMatch = raw.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
                 result = JSON.parse(jsonMatch[0]);
@@ -717,9 +923,9 @@ function fetchWithRetry(url, options, retries = 3, delay = 800) {
     });
 }
 
-// ─── AUTO AI SCAN ────────────────────────────────────────────────────────────
+// ─── AUTO AI SCAN (per-ticker) ───────────────────────────────────────────────
 function toggleAutoScan(enabled) {
-    if (aiScanInterval)  { clearInterval(aiScanInterval);  aiScanInterval  = null; }
+    if (aiScanInterval)   { clearInterval(aiScanInterval);  aiScanInterval  = null; }
     if (aiCountdownTimer) { clearInterval(aiCountdownTimer); aiCountdownTimer = null; }
     document.getElementById("ai-scan-countdown").innerText = "";
 
@@ -813,7 +1019,16 @@ function loadHoldings() {
     try {
         const h = localStorage.getItem("copilot_holdings");
         const b = localStorage.getItem("copilot_balance");
-        if (h) holdings = JSON.parse(h);
+        if (h) {
+            holdings = JSON.parse(h);
+            // Seed watchlist with held tickers
+            for (const t in holdings) {
+                if (!watchlist[t]) {
+                    const isCrypto = t.includes("USD") || t === "BTC" || t === "ETH" || t === "SOL";
+                    watchlist[t] = { price: holdings[t].entryPrice, change: 0, isCrypto };
+                }
+            }
+        }
         if (b) portfolioBalance = parseFloat(b);
     } catch (_) {}
 }
@@ -841,10 +1056,10 @@ function submitManualPurchase() {
 
     // Add to watchlist if it's a new ticker
     if (!watchlist[rawTicker]) {
-        const isCrypto = rawTicker.includes("USD") || rawTicker === "BTC" || rawTicker === "ETH";
+        const isCrypto = rawTicker.includes("USD") || rawTicker === "BTC" || rawTicker === "ETH" || rawTicker === "SOL";
         watchlist[rawTicker] = { price, change: 0, isCrypto };
         initWatchlistTable();
-        addLog(`[WATCHLIST] Added new ticker: ${rawTicker}`, "info");
+        addLog(`[WATCHLIST] Added new ticker from trade: ${rawTicker}`, "info");
     }
 
     holdings[rawTicker] = { quantity: qty, entryPrice: price, targetTP: tp, targetSL: sl };
@@ -856,7 +1071,13 @@ function submitManualPurchase() {
 
     addLog(`[TRADE] Recorded BUY ${qty} × ${rawTicker} @ $${price.toFixed(2)} | TP $${tp.toFixed(2)} | SL $${sl.toFixed(2)}`, "trade-win");
     showToast(`${rawTicker} position recorded!`);
-    sendTelegramMessage(`📈 <b>REVOLUT COPILOT — BUY RECORDED</b>\n\nAsset: ${rawTicker}\nQty: ${qty}\nEntry: $${price.toFixed(2)}\n🎯 TP: $${tp.toFixed(2)}\n🛡️ SL: $${sl.toFixed(2)}`);
+    sendTelegramMessage(`📈 <b>REVOLUT COPILOT — BUY RECORDED</b>
+
+Asset: ${rawTicker}
+Qty: ${qty}
+Entry: $${price.toFixed(2)}
+🎯 TP: $${tp.toFixed(2)}
+🛡️ SL: $${sl.toFixed(2)}`);
     toggleModal("modal-manual-add");
 }
 
@@ -936,7 +1157,12 @@ function closeTrade(ticker, reason) {
     const isWin = pnl >= 0;
     addLog(`[CLOSE] ${ticker} @ $${exitPrice.toFixed(2)} — ${reason}. P&L: ${isWin ? "+" : ""}$${pnl.toFixed(2)}`, isWin ? "trade-win" : "trade-loss");
     showToast(`${ticker} closed ${isWin ? "in profit" : "at loss"}: ${isWin ? "+" : ""}$${pnl.toFixed(2)}`, isWin);
-    sendTelegramMessage(`🚨 <b>REVOLUT EXIT ALERT</b>\n\nAsset: ${ticker}\n${reason}\nExit: $${exitPrice.toFixed(2)}\nP&L: ${isWin ? "+" : ""}$${pnl.toFixed(2)}`);
+    sendTelegramMessage(`🚨 <b>REVOLUT EXIT ALERT</b>
+
+Asset: ${ticker}
+${reason}
+Exit: $${exitPrice.toFixed(2)}
+P&L: ${isWin ? "+" : ""}$${pnl.toFixed(2)}`);
 }
 
 // ─── PORTFOLIO STATS ──────────────────────────────────────────────────────────
@@ -947,7 +1173,7 @@ function updateStats() {
     }
     const total = portfolioBalance + holdingsValue;
     const pnl   = total - originalBalance;
-    const pct   = (pnl / originalBalance) * 100;
+    const pct   = originalBalance > 0 ? (pnl / originalBalance) * 100 : 0;
     const sign  = pnl >= 0 ? "+" : "";
 
     document.getElementById("stat-total-balance").innerText = `$${total.toLocaleString(undefined,{minimumFractionDigits:2})}`;
